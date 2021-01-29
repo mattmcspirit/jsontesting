@@ -215,6 +215,15 @@ configuration AKSHCIHost
             DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
         }
 
+        xDhcpServerOption "DHCpServerOption" 
+        { 
+            Ensure             = 'Present'
+            DnsDomain          = 'akshci.local'
+            DnsServerIPAddress = '192.168.0.1'
+            AddressFamily      = 'IPv4'
+            DependsOn          = @("[WindowsFeature]Install DHCPServer", "[IPAddress]New IP for vEthernet $vSwitchNameHost")
+        }
+
         xDhcpServerScope "Scope 192.168.0.0" { 
             Ensure        = 'Present'
             IPStartRange  = '192.168.0.3'
@@ -225,18 +234,15 @@ configuration AKSHCIHost
             LeaseDuration = '01.00:00:00' 
             State         = 'Inactive'
             AddressFamily = 'IPv4'
-            DependsOn     = @("[WindowsFeature]Install DHCPServer", "[IPAddress]New IP for vEthernet $vSwitchNameHost")
+            DependsOn     = "[xDhcpServerScope]Scope 192.168.0.0"
         }
 
-        xDhcpServerOption "Option 192.168.0.0" 
-        { 
-            Ensure             = 'Present' 
-            ScopeID            = '192.168.0.0' 
-            DnsDomain          = 'akshci.local'
-            DnsServerIPAddress = '192.168.0.1'
-            AddressFamily      = 'IPv4'
-            Router             = '192.168.0.1'
-            DependsOn          = @("[WindowsFeature]Install DHCPServer", "[IPAddress]New IP for vEthernet $vSwitchNameHost")
+        DhcpScopeOptionValue "DHCpServerScopeOption" {
+            OptionId      = 3
+            Value         = '192.168.0.1'
+            ScopeId       = '192.168.0.0'
+            AddressFamily = 'IPv4'
+            DependsOn     = "[xDhcpServerOption]DHCpServerOption"
         }
 
         script NAT {
@@ -260,37 +266,37 @@ configuration AKSHCIHost
         }
 
         xDnsServerPrimaryZone SetPrimaryDNSZone {
-            Name = 'akshci.local'
-            Ensure = 'Present'
-            DependsOn = "[script]NAT"
-            ZoneFile = 'akshci.local.dns'
+            Name          = 'akshci.local'
+            Ensure        = 'Present'
+            DependsOn     = "[script]NAT"
+            ZoneFile      = 'akshci.local.dns'
             DynamicUpdate = 'NonSecureAndSecure'
         }
 
         xDnsServerPrimaryZone SetReverseLookupZone {
-            Name = '0.168.192.in-addr.arpa'
-            Ensure = 'Present'
-            DependsOn = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
-            ZoneFile = '0.168.192.in-addr.arpa.dns'
+            Name          = '0.168.192.in-addr.arpa'
+            Ensure        = 'Present'
+            DependsOn     = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
+            ZoneFile      = '0.168.192.in-addr.arpa.dns'
             DynamicUpdate = 'NonSecureAndSecure'
         }
 
         xDnsServerSetting SetListener {
-            Name = 'AksHciListener'
+            Name            = 'AksHciListener'
             ListenAddresses = '192.168.0.1'
-            Forwarders = @('1.1.1.1', '1.0.0.1')
-            DependsOn = "[xDnsServerPrimaryZone]SetReverseLookupZone"
+            Forwarders      = @('1.1.1.1', '1.0.0.1')
+            DependsOn       = "[xDnsServerPrimaryZone]SetReverseLookupZone"
         }
 
         Script SetDHCPDNSSetting {
-            SetScript = { 
+            SetScript  = { 
                 Set-DhcpServerv4DnsSetting -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True -UpdateDnsRRForOlderClients $True -DisableDnsPtrRRUpdate $false
                 Write-Verbose -Verbose "Setting server level DNS dynamic update configuration settings" 
             }
-            GetScript = { @{} 
+            GetScript  = { @{} 
             }
             TestScript = { $false }
-            DependsOn = "[xDnsServerSetting]SetListener"
+            DependsOn  = "[xDnsServerSetting]SetListener"
         }
         
         cChocoInstaller InstallChoco {
@@ -299,21 +305,21 @@ configuration AKSHCIHost
 
         cChocoFeature allowGlobalConfirmation {
             FeatureName = "allowGlobalConfirmation"
-            Ensure = 'Present'
-            DependsOn = '[cChocoInstaller]installChoco'
+            Ensure      = 'Present'
+            DependsOn   = '[cChocoInstaller]installChoco'
         }
 
         cChocoFeature useRememberedArgumentsForUpgrades {
             FeatureName = "useRememberedArgumentsForUpgrades"
-            Ensure = 'Present'
-            DependsOn = '[cChocoInstaller]installChoco'
+            Ensure      = 'Present'
+            DependsOn   = '[cChocoInstaller]installChoco'
         }
 
         cChocoPackageInstaller "Install Chromium Edge" {
-            Name = 'microsoft-edge'
-            Ensure = 'Present'
+            Name        = 'microsoft-edge'
+            Ensure      = 'Present'
             AutoUpgrade = $true
-            DependsOn = '[cChocoInstaller]installChoco'
+            DependsOn   = '[cChocoInstaller]installChoco'
         }
     }
 }
