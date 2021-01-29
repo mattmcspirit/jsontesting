@@ -209,33 +209,33 @@ configuration AKSHCIHost
 
         DnsServerAddress "DnsServerAddress for vEthernet $vSwitchNameHost" 
         { 
-            Address        = '192.168.0.1' 
+            Address        = '172.0.0.1' 
             InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
             AddressFamily  = 'IPv4'
             DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
         }
 
-        xDhcpServerScope AksHciScope { 
+        xDhcpServerScope "AksHciDhcpScope" { 
             Ensure        = 'Present'
             IPStartRange  = '192.168.0.3'
             IPEndRange    = '192.168.0.240' 
             ScopeId       = '192.168.0.0'
-            Name          = 'AKS-HCI Lab Range' 
-            SubnetMask    = '255.255.255.0' 
-            LeaseDuration = '01.00:00:00' 
+            Name          = 'AKS-HCI Lab Range'
+            SubnetMask    = '255.255.255.0'
+            LeaseDuration = '01.00:00:00'
             State         = 'Inactive'
             AddressFamily = 'IPv4'
             DependsOn     = @("[WindowsFeature]Install DHCPServer", "[IPAddress]New IP for vEthernet $vSwitchNameHost")
         }
 
-        xDhcpServerOption DHCpServerOption { 
+        xDhcpServerOption "AksHciDhcpServerOption" { 
             Ensure             = 'Present' 
             ScopeID            = '192.168.0.0' 
             DnsDomain          = 'akshci.local'
             DnsServerIPAddress = '192.168.0.1'
             AddressFamily      = 'IPv4'
             Router             = '192.168.0.1'
-            DependsOn          = "[xDhcpServerScope]AksHciScope"
+            DependsOn          = "[xDhcpServerScope]AksHciDhcpScope"
         }
 
         script NAT {
