@@ -215,36 +215,27 @@ configuration AKSHCIHost
             DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
         }
 
-        xDhcpServerOption "DHCpServerOption" 
-        { 
-            Ensure             = 'Present'
-            DnsDomain          = 'akshci.local'
-            DnsServerIPAddress = '192.168.0.1'
-            AddressFamily      = 'IPv4'
-            DependsOn          = @("[WindowsFeature]Install DHCPServer", "[IPAddress]New IP for vEthernet $vSwitchNameHost")
-        }
-
-        xDhcpServerScope "Scope 192.168.0.0" { 
+        xDhcpServerScope AksHciScope { 
             Ensure        = 'Present'
             IPStartRange  = '192.168.0.3'
             IPEndRange    = '192.168.0.240' 
             ScopeId       = '192.168.0.0'
-            Name          = 'AKS-HCI Range' 
+            Name          = 'AKS-HCI Lab Range' 
             SubnetMask    = '255.255.255.0' 
             LeaseDuration = '01.00:00:00' 
             State         = 'Inactive'
             AddressFamily = 'IPv4'
-            DependsOn     = "[xDhcpServerScope]Scope 192.168.0.0"
+            DependsOn     = @("[WindowsFeature]Install DHCPServer", "[IPAddress]New IP for vEthernet $vSwitchNameHost")
         }
 
-        DhcpScopeOptionValue "DHCpServerScopeOption" {
-            OptionId      = 3
-            Value         = '192.168.0.1'
-            ScopeId       = '192.168.0.0'
-            AddressFamily = 'IPv4'
-            VendorClass   = ''
-            UserClass     = ''
-            DependsOn     = "[xDhcpServerScope]Scope 192.168.0.0"
+        xDhcpServerOption DHCpServerOption { 
+            Ensure             = 'Present' 
+            ScopeID            = '192.168.0.0' 
+            DnsDomain          = 'akshci.local'
+            DnsServerIPAddress = '192.168.0.1'
+            AddressFamily      = 'IPv4'
+            Router             = '192.168.0.1'
+            DependsOn          = "[xDhcpServerScope]AksHciScope"
         }
 
         script NAT {
