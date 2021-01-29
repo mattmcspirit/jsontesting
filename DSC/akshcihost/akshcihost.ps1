@@ -242,6 +242,8 @@ configuration AKSHCIHost
             Value         = '192.168.0.1'
             ScopeId       = '192.168.0.0'
             AddressFamily = 'IPv4'
+            VendorClass   = ''
+            UserClass     = ''
             DependsOn     = "[xDhcpServerOption]DHCpServerOption"
         }
 
