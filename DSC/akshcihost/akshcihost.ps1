@@ -154,7 +154,7 @@ configuration AKSHCIHost
             InterfaceAlias   = 'Ethernet'
             NetworkCategory  = 'Public'
             IPv4Connectivity = 'Internet'
-            IPv6Connectivity = 'Internet'
+            IPv6Connectivity = 'NoTraffic'
         }
 
         IPAddress "New IP for vEthernet $vSwitchNameHost"
