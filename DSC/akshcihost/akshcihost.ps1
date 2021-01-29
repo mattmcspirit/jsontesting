@@ -152,9 +152,7 @@ configuration AKSHCIHost
         NetConnectionProfile SetPublicEnableInternet
         {
             InterfaceAlias   = 'Ethernet'
-            NetworkCategory  = 'Public'
-            IPv4Connectivity = 'Internet'
-            IPv6Connectivity = 'NoTraffic'
+            NetworkCategory  = 'Private'
         }
 
         IPAddress "New IP for vEthernet $vSwitchNameHost"
