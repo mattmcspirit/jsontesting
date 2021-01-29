@@ -274,17 +274,12 @@ configuration AKSHCIHost
             ZoneFile = '0.168.192.in-addr.arpa.dns'
             DynamicUpdate = 'NonSecureAndSecure'
         }
-            
-        xDnsServerForwarder SetForwarder {
-            IsSingleInstance = 'Yes'
-            IPAddresses = 'Present'
-            DependsOn = "[xDnsServerPrimaryZone]SetReverseLookupZone"
-        }
 
         xDnsServerSetting SetListener {
             Name = 'AksHciListener'
-            ListenAddresses = '1.1.1.1','1.0.0.1'
-            DependsOn = "[xDnsServerForwarder]SetForwarder"
+            ListenAddresses = '192.168.0.1'
+            Forwarders = @('1.1.1.1', '1.0.0.1')
+            DependsOn = "[xDnsServerPrimaryZone]SetReverseLookupZone"
         }
 
         Script SetDHCPDNSSetting {
