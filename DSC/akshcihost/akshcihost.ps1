@@ -8,7 +8,6 @@ configuration AKSHCIHost
         [Int]$RetryIntervalSec = 30,
         [string]$vSwitchNameHost = "InternalNAT",
         [String]$targetDrive = "V:",
-        [String]$sourcePath = "$targetDrive\source",
         [String]$targetVMPath = "$targetDrive\VMs",
         [String]$baseVHDFolderPath = "$targetVMPath\base"
     ) 
@@ -24,8 +23,6 @@ configuration AKSHCIHost
     Import-DscResource -ModuleName 'xDNSServer'
     Import-DscResource -ModuleName 'cChoco'
     Import-DscResource -ModuleName 'DSCR_Shortcut'
-    
-    $branchFiles = "https://github.com/mattmcspirit/jsontesting/archive/main.zip"
 
     Node localhost
     {
@@ -49,24 +46,11 @@ configuration AKSHCIHost
             DependsOn   = "[xWaitForDisk]Disk1"
         }
 
-        File "source" {
-            DestinationPath = $sourcePath
-            Type            = 'Directory'
-            Force           = $true
-            DependsOn       = "[xDisk]dataDisk"
-        }
-
         File "folder-vms" {
             Type            = 'Directory'
             DestinationPath = $targetVMPath
             DependsOn       = "[xDisk]dataDisk"
         }
-
-        File "VM-base" {
-            Type            = 'Directory'
-            DestinationPath = $baseVHDFolderPath
-            DependsOn       = "[File]folder-vms"
-        } 
 
         Registry "Disable Internet Explorer ESC for Admin" {
             Key       = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"
@@ -94,25 +78,6 @@ configuration AKSHCIHost
             TaskName = 'ServerManager'
             Enable   = $false
             TaskPath = '\Microsoft\Windows\Server Manager'
-        }
-
-        script "Download branch files for main" {
-            GetScript  = {
-                $result = Test-Path -Path "$using:sourcePath\main.zip"
-                return @{ 'Result' = $result }
-            }
-
-            SetScript  = {
-                Invoke-WebRequest -Uri $using:branchFiles -OutFile "$using:sourcePath\main.zip"
-                #Start-BitsTransfer -Source $using:branchFiles -Destination "$using:sourcePath\$using:branch.zip"        
-            }
-
-            TestScript = {
-                # Create and invoke a scriptblock using the $GetScript automatic variable, which contains a string representation of the GetScript.
-                $state = [scriptblock]::Create($GetScript).Invoke()
-                return $state.Result
-            }
-            DependsOn  = "[File]source"
         }
 
         WindowsFeature DNS { 
