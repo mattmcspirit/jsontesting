@@ -6,11 +6,9 @@
         "xPSDesiredStateConfiguration",
         "xHyper-v",
         "cHyper-v",
-        "WindowsImageTools",
         "xDhcpServer",
         "xDNSServer",
         "cChoco",
-        "WindowsDeploymentHelper",
         "DSCR_Shortcut"
     ]
 }
