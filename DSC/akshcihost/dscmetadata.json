@@ -1,0 +1,15 @@
+{
+    "Modules": [
+        "xStorage",
+        "NetworkingDSC",
+        "ComputerManagementDsc",
+        "xPSDesiredStateConfiguration",
+        "xHyper-v",
+        "cHyper-v",
+        "WindowsImageTools",
+        "xDhcpServer",
+        "cChoco",
+        "WindowsDeploymentHelper",
+        "DSCR_Shortcut"
+    ]
+}
