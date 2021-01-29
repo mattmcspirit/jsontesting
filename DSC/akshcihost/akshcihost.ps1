@@ -149,6 +149,14 @@ configuration AKSHCIHost
             DependsOn = "[WindowsFeature]Hyper-V"
         }
 
+        NetConnectionProfile SetPublicEnableInternet
+        {
+            InterfaceAlias   = 'Ethernet'
+            NetworkCategory  = 'Public'
+            IPv4Connectivity = 'Internet'
+            IPv6Connectivity = 'Internet'
+        }
+
         IPAddress "New IP for vEthernet $vSwitchNameHost"
         {
             InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
