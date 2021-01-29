@@ -209,7 +209,7 @@ configuration AKSHCIHost
 
         DnsServerAddress "DnsServerAddress for vEthernet $vSwitchNameHost" 
         { 
-            Address        = '127.0.0.1' 
+            Address        = '192.168.0.1' 
             InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
             AddressFamily  = 'IPv4'
             DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
@@ -244,7 +244,7 @@ configuration AKSHCIHost
             AddressFamily = 'IPv4'
             VendorClass   = ''
             UserClass     = ''
-            DependsOn     = "[xDhcpServerOption]DHCpServerOption"
+            DependsOn     = "[xDhcpServerScope]Scope 192.168.0.0"
         }
 
         script NAT {
