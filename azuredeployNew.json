@@ -325,8 +325,9 @@
                     },
                     "osDisk": {
                         "createOption": "FromImage",
+                        "diskSizeGB": "64",
                         "managedDisk": {
-                            "storageAccountType": "Standard_LRS"
+                            "storageAccountType": "StandardSSD_LRS"
                         }
                     },
                     "dataDisks": [
@@ -501,10 +502,6 @@
         },
         "fqdn": {
             "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses',variables('publicIPAddressName'))).dnsSettings.fqdn]",
-            "type": "string"
-        },
-        "ipaddress": {
-            "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses',variables('publicIPAddressName'))).ipAddress]",
             "type": "string"
         }
     }
