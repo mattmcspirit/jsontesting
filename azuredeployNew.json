@@ -381,7 +381,7 @@
                 {
                     "type": "extensions",
                     "name": "ConfigureAksHciHost",
-                    "apiVersion": "2018-10-01",
+                    "apiVersion": "2020-06-01",
                     "location": "[resourceGroup().location]",
                     "dependsOn": [
                         "[parameters('virtualMachineName')]"
@@ -399,17 +399,13 @@
                                 "function": "AKSHCIHost"
                             },
                             "configurationArguments": {
-                                "AdminCreds": {
-                                    "UserName": "[parameters('adminUsername')]",
-                                    "Password": "PrivateSettingsRef:AdminPassword"
-                                }
                             }
                         },
                         "protectedSettings": {
                             "configurationArguments": {
-                                "Items": {
+                                "AdminCreds": {
                                     "UserName": "[parameters('adminUsername')]",
-                                    "AdminPassword": "[parameters('adminPassword')]"
+                                    "Password": "[parameters('adminPassword')]"
                                 }
                             }
                         }

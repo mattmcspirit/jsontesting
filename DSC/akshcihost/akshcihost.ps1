@@ -215,13 +215,6 @@ configuration AKSHCIHost
             DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
         }
 
-        xDhcpServerAuthorization "Authorize DHCP" {
-            Ensure    = 'Present'
-            DependsOn = @('[WindowsFeature]Install DHCPServer')
-            # DnsName = [System.Net.Dns]::GetHostByName($env:computerName).hostname
-            IPAddress = '192.168.0.1'
-        }
-
         xDhcpServerScope "Scope 192.168.0.0" { 
             Ensure        = 'Present'
             IPStartRange  = '192.168.0.3'
