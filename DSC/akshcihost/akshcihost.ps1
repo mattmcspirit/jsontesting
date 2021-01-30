@@ -69,7 +69,7 @@ configuration AKSHCIHost
         Registry "Add Wac to Intranet zone for SSO" {
             Key       = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\EscDomains\wac'
             ValueName = "https"
-            ValueData = 1
+            ValueData = "1"
             ValueType = 'Dword'
         }
 
