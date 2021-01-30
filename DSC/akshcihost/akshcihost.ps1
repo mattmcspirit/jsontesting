@@ -73,6 +73,12 @@ configuration AKSHCIHost
             ValueType = 'Dword'
         }
 
+        Registry "Disable Network Profile Prompt" {
+            Key         = 'HKLM:\System\CurrentControlSet\Control\Network\NewNetworkWindowOff'
+            Ensure      = 'Present'
+            ValueName   = ''
+        }
+
         ScheduledTask "Disable Server Manager at Startup"
         {
             TaskName = 'ServerManager'
