@@ -225,7 +225,7 @@ configuration AKSHCIHost
         xDhcpServerScope "AksHciDhcpScope" { 
             Ensure        = 'Present'
             IPStartRange  = '192.168.0.3'
-            IPEndRange    = '192.168.0.240' 
+            IPEndRange    = '192.168.0.149' 
             ScopeId       = '192.168.0.0'
             Name          = 'AKS-HCI Lab Range'
             SubnetMask    = '255.255.255.0'

@@ -298,7 +298,7 @@
         }
     },
     "variables": {
-        "dscUri": "https://github.com/mattmcspirit/jsontesting/raw/Ben/DSC/akshcihost.zip",
+        "dscUri": "https://github.com/mattmcspirit/jsontesting/raw/main/DSC/akshcihost.zip",
         "randomGUID": "[substring(uniqueString(subscription().subscriptionId, resourceGroup().id, parameters('virtualMachineName')),0,6)]",
         "dnsNameForPublicIP": "[toLower(concat(parameters('virtualMachineName'), variables('randomGUID')))]",
         "virtualNetworkName": "AKSHCILabvNet",
