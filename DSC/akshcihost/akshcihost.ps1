@@ -4,6 +4,8 @@ configuration AKSHCIHost
     ( 
         [Parameter(Mandatory)]
         [System.Management.Automation.PSCredential]$AdminCreds,
+        [string]$enableDHCP,
+        [string]$customRdpPort,
         [Int]$RetryCount = 20,
         [Int]$RetryIntervalSec = 30,
         [string]$vSwitchNameHost = "InternalNAT",
@@ -23,6 +25,11 @@ configuration AKSHCIHost
     Import-DscResource -ModuleName 'xDNSServer'
     Import-DscResource -ModuleName 'cChoco'
     Import-DscResource -ModuleName 'DSCR_Shortcut'
+
+    if ($enableDHCP -eq "Enabled") {
+        $dhcpStatus = "Active"
+    }
+    else { $dhcpStatus = "Inactive" }
 
     Node localhost
     {
@@ -74,9 +81,32 @@ configuration AKSHCIHost
         }
 
         Registry "Disable Network Profile Prompt" {
-            Key         = 'HKLM:\System\CurrentControlSet\Control\Network\NewNetworkWindowOff'
-            Ensure      = 'Present'
-            ValueName   = ''
+            Key       = 'HKLM:\System\CurrentControlSet\Control\Network\NewNetworkWindowOff'
+            Ensure    = 'Present'
+            ValueName = ''
+        }
+
+        if ($customRdpPort -ne "3389") {
+
+            Registry "Set Custom RDP Port" {
+                Key       = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
+                ValueName = "PortNumber"
+                ValueData = "$customRdpPort"
+                ValueType = 'Dword'
+            }
+
+            Firewall AddFirewallRule
+            {
+                Name        = 'CustomRdpRule'
+                DisplayName = 'Custom Rule for RDP'
+                Ensure      = 'Present'
+                Enabled     = 'True'
+                Profile     = 'Any'
+                Direction   = 'Inbound'
+                LocalPort   = "$customRdpPort"
+                Protocol    = 'TCP'
+                Description = 'Firewall Rule for Custom RDP Port'
+            }
         }
 
         ScheduledTask "Disable Server Manager at Startup"
@@ -157,8 +187,8 @@ configuration AKSHCIHost
 
         NetConnectionProfile SetPublicEnableInternet
         {
-            InterfaceAlias   = 'Ethernet'
-            NetworkCategory  = 'Private'
+            InterfaceAlias  = 'Ethernet'
+            NetworkCategory = 'Private'
         }
 
         IPAddress "New IP for vEthernet $vSwitchNameHost"
@@ -200,7 +230,7 @@ configuration AKSHCIHost
             Name          = 'AKS-HCI Lab Range'
             SubnetMask    = '255.255.255.0'
             LeaseDuration = '01.00:00:00'
-            State         = 'Inactive'
+            State         = "$dhcpStatus"
             AddressFamily = 'IPv4'
             DependsOn     = @("[WindowsFeature]Install DHCPServer", "[IPAddress]New IP for vEthernet $vSwitchNameHost")
         }
