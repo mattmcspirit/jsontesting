@@ -114,6 +114,24 @@
         "adminPassword": {
             "type": "securestring"
         },
+        "enableDHCP": {
+            "type": "string",
+            "defaultValue": "Enabled",
+            "allowedValues": [
+                "Enabled",
+                "Disabled"
+            ],
+            "metadata": {
+                "description": "Choose whether you wish to enable DHCP in the environment for AKS-HCI testing. If you choose Disabled, it can be enabled after deployment."
+            }
+        },
+        "customRdpPort": {
+            "type": "string",
+            "defaultValue": "3389",
+            "metadata": {
+                "description": "If you wish to use a different port to RDP into the VM, change it here, otherwise, leave the default."
+            }
+        },
         "autoShutdownStatus": {
             "type": "string",
             "defaultValue": "Enabled",
@@ -280,7 +298,7 @@
         }
     },
     "variables": {
-        "dscUri": "https://github.com/mattmcspirit/jsontesting/raw/main/DSC/akshcihost.zip",
+        "dscUri": "https://github.com/mattmcspirit/jsontesting/raw/Ben/DSC/akshcihost.zip",
         "randomGUID": "[substring(uniqueString(subscription().subscriptionId, resourceGroup().id, parameters('virtualMachineName')),0,6)]",
         "dnsNameForPublicIP": "[toLower(concat(parameters('virtualMachineName'), variables('randomGUID')))]",
         "virtualNetworkName": "AKSHCILabvNet",
@@ -372,6 +390,8 @@
                                 "function": "AKSHCIHost"
                             },
                             "configurationArguments": {
+                                "enableDHCP": "[parameters('enableDHCP')]",
+                                "customRdpPort": "[parameters('customRdpPort')]"
                             }
                         },
                         "protectedSettings": {
@@ -478,7 +498,7 @@
             "properties": {
                 "securityRules": [
                     {
-                        "name": "default-allow-rdp",
+                        "name": "rdp",
                         "properties": {
                             "priority": 1000,
                             "protocol": "Tcp",
@@ -487,7 +507,7 @@
                             "sourceAddressPrefix": "*",
                             "sourcePortRange": "*",
                             "destinationAddressPrefix": "*",
-                            "destinationPortRange": "3389"
+                            "destinationPortRange": "[parameters('customRdpPort')]"
                         }
                     }
                 ]
@@ -498,6 +518,10 @@
         "adminUsername": {
             "type": "string",
             "value": "[parameters('adminUsername')]"
+        },
+        "rdpPort": {
+            "type": "string",
+            "value": "[parameters('customRdpPort')]"
         },
         "fqdn": {
             "value": "[reference(resourceId('Microsoft.Network/publicIPAddresses',variables('publicIPAddressName'))).dnsSettings.fqdn]",
