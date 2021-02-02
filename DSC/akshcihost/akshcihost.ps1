@@ -39,16 +39,18 @@ configuration AKSHCIHost
             ConfigurationMode  = 'ApplyOnly'
         }
 
+        $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'RAW').UniqueId
+
         xWaitforDisk Disk1
         {
-            DiskID     = 1
+            DiskID     = "$getDisk"
             RetryIntervalSec =$RetryIntervalSec
             RetryCount = $RetryCount
         }
 
         xDisk dataDisk
         {
-            DiskID      = 1
+            DiskID      = "$getDisk"
             DriveLetter = $targetDrive
             DependsOn   = "[xWaitForDisk]Disk1"
         }
