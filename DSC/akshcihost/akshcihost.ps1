@@ -54,13 +54,13 @@ configuration AKSHCIHost
             DiskID      = "$getDisk"
             DiskIdType = 'UniqueId'
             DriveLetter = $targetDrive
-            DependsOn   = "[xWaitForDisk]Disk1"
+            DependsOn   = "[WaitForDisk]Disk1"
         }
 
         File "folder-vms" {
             Type            = 'Directory'
             DestinationPath = $targetVMPath
-            DependsOn       = "[xDisk]dataDisk"
+            DependsOn       = "[Disk]dataDisk"
         }
 
         Registry "Disable Internet Explorer ESC for Admin" {
