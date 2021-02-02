@@ -1,6 +1,6 @@
 {
     "Modules": [
-        "xStorage",
+        "StorageDSC",
         "NetworkingDSC",
         "ComputerManagementDsc",
         "xPSDesiredStateConfiguration",

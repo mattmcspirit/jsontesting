@@ -14,7 +14,7 @@ configuration AKSHCIHost
         [String]$baseVHDFolderPath = "$targetVMPath\base"
     ) 
     
-    Import-DscResource -ModuleName 'xStorage'
+    Import-DscResource -ModuleName 'StorageDSC'
     Import-DscResource -ModuleName 'NetworkingDSC'
     Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
     Import-DscResource -ModuleName 'ComputerManagementDsc'
@@ -41,16 +41,18 @@ configuration AKSHCIHost
 
         $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'RAW').UniqueId
 
-        xWaitforDisk Disk1
+        WaitforDisk Disk1
         {
             DiskID     = "$getDisk"
+            DiskIdType = 'UniqueId'
             RetryIntervalSec =$RetryIntervalSec
             RetryCount = $RetryCount
         }
 
-        xDisk dataDisk
+        Disk dataDisk
         {
             DiskID      = "$getDisk"
+            DiskIdType = 'UniqueId'
             DriveLetter = $targetDrive
             DependsOn   = "[xWaitForDisk]Disk1"
         }
