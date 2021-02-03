@@ -41,11 +41,16 @@ configuration AKSHCIHost
 
         $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'RAW').UniqueId
 
+        if ($getDisk -eq $null) {
+            # Disk has already been formatted to GPT, so search for that disk instead:
+            $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'GPT').UniqueId
+        }
+
         WaitforDisk Disk1
         {
             DiskID     = "$getDisk"
             DiskIdType = 'UniqueId'
-            RetryIntervalSec =$RetryIntervalSec
+            RetryIntervalSec = $RetryIntervalSec
             RetryCount = $RetryCount
         }
 
