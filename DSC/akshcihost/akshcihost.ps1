@@ -39,33 +39,32 @@ configuration AKSHCIHost
             ConfigurationMode  = 'ApplyOnly'
         }
 
-        $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'RAW').UniqueId
+        if ((Test-Path -Path "$targetVMPath") -eq $false) {
+            $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'RAW').UniqueId
+            if ($getDisk -eq $null) {
+                # Disk has already been formatted to GPT, so search for that disk instead:
+                $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'GPT').UniqueId
+            }
 
-        if ($getDisk -eq $null) {
-            # Disk has already been formatted to GPT, so search for that disk instead:
-            $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'GPT').UniqueId
-        }
+            WaitforDisk Disk1 {
+                DiskID           = "$getDisk"
+                DiskIdType       = 'UniqueId'
+                RetryIntervalSec = $RetryIntervalSec
+                RetryCount       = $RetryCount
+            }
 
-        WaitforDisk Disk1
-        {
-            DiskID     = "$getDisk"
-            DiskIdType = 'UniqueId'
-            RetryIntervalSec = $RetryIntervalSec
-            RetryCount = $RetryCount
-        }
+            Disk dataDisk {
+                DiskID      = "$getDisk"
+                DiskIdType  = 'UniqueId'
+                DriveLetter = $targetDrive
+                DependsOn   = "[WaitForDisk]Disk1"
+            }
 
-        Disk dataDisk
-        {
-            DiskID      = "$getDisk"
-            DiskIdType = 'UniqueId'
-            DriveLetter = $targetDrive
-            DependsOn   = "[WaitForDisk]Disk1"
-        }
-
-        File "folder-vms" {
-            Type            = 'Directory'
-            DestinationPath = $targetVMPath
-            DependsOn       = "[Disk]dataDisk"
+            File "folder-vms" {
+                Type            = 'Directory'
+                DestinationPath = $targetVMPath
+                DependsOn       = "[Disk]dataDisk"
+            }
         }
 
         Registry "Disable Internet Explorer ESC for Admin" {
