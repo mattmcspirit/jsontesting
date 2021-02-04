@@ -203,7 +203,7 @@ configuration AKSHCIHost
         {
             InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
             AddressFamily  = 'IPv4'
-            IPAddress      = '192.168.0.1/24'
+            IPAddress      = '192.168.0.1/16'
             DependsOn      = "[xVMSwitch]$vSwitchNameHost"
         }
 
@@ -236,7 +236,7 @@ configuration AKSHCIHost
             IPEndRange    = '192.168.0.149' 
             ScopeId       = '192.168.0.0'
             Name          = 'AKS-HCI Lab Range'
-            SubnetMask    = '255.255.255.0'
+            SubnetMask    = '255.255.0.0'
             LeaseDuration = '01.00:00:00'
             State         = "$dhcpStatus"
             AddressFamily = 'IPv4'
@@ -262,7 +262,7 @@ configuration AKSHCIHost
 
             SetScript  = {
                 $nat = "AKSHCINAT"
-                New-NetNat -Name $nat -InternalIPInterfaceAddressPrefix "192.168.0.0/24"          
+                New-NetNat -Name $nat -InternalIPInterfaceAddressPrefix "192.168.0.0/16"          
             }
 
             TestScript = {
