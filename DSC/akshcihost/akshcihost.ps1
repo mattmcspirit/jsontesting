@@ -306,28 +306,37 @@ configuration AKSHCIHost
             TestScript = { $false }
             DependsOn  = "[xDnsServerSetting]SetListener"
         }
-        
-        cChocoInstaller InstallChoco {
-            InstallDir = "c:\choco"
+
+        Script installChoco {
+            SetScript  = { 
+                Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+            }
+            GetScript  = { @{} 
+            }
+            TestScript = { $false }
         }
+        
+        #cChocoInstaller InstallChoco {
+        #    InstallDir = "c:\choco"
+        #}
 
         cChocoFeature allowGlobalConfirmation {
             FeatureName = "allowGlobalConfirmation"
             Ensure      = 'Present'
-            DependsOn   = '[cChocoInstaller]installChoco'
+            DependsOn   = '[Script]installChoco'
         }
 
         cChocoFeature useRememberedArgumentsForUpgrades {
             FeatureName = "useRememberedArgumentsForUpgrades"
             Ensure      = 'Present'
-            DependsOn   = '[cChocoInstaller]installChoco'
+            DependsOn   = '[Script]installChoco'
         }
 
         cChocoPackageInstaller "Install Chromium Edge" {
             Name        = 'microsoft-edge'
             Ensure      = 'Present'
             AutoUpgrade = $true
-            DependsOn   = '[cChocoInstaller]installChoco'
+            DependsOn   = '[Script]installChoco'
         }
     }
 }
