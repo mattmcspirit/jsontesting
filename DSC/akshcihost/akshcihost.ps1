@@ -333,10 +333,22 @@ configuration AKSHCIHost
             DependsOn   = '[Script]installChoco'
         }
 
+        <#
         cChocoPackageInstaller "Install Chromium Edge" {
             Name        = 'microsoft-edge'
             Ensure      = 'Present'
             AutoUpgrade = $true
+            DependsOn   = '[Script]installChoco'
+        }
+        #>
+
+        Script installEdge {
+            SetScript  = {
+                choco install microsoft-edge
+            }
+            GetScript  = { @{} 
+            }
+            TestScript = { $false }
             DependsOn   = '[Script]installChoco'
         }
     }
