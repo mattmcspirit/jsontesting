@@ -334,10 +334,6 @@ configuration AKSHCIHost
             }
             TestScript = { $false }
         }
-        
-        #cChocoInstaller InstallChoco {
-        #    InstallDir = "c:\choco"
-        #}
 
         cChocoFeature allowGlobalConfirmation {
             FeatureName = "allowGlobalConfirmation"
@@ -350,15 +346,6 @@ configuration AKSHCIHost
             Ensure      = 'Present'
             DependsOn   = '[Script]installChoco'
         }
-
-        <#
-        cChocoPackageInstaller "Install Chromium Edge" {
-            Name        = 'microsoft-edge'
-            Ensure      = 'Present'
-            AutoUpgrade = $true
-            DependsOn   = '[Script]installChoco'
-        }
-        #>
 
         Script installEdge {
             SetScript  = {
