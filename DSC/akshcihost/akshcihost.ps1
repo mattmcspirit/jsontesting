@@ -131,6 +131,13 @@ configuration AKSHCIHost
             ValueData = "1"
             ValueType = 'Dword'
         }
+        
+        Registry "Disable Server Manager WAC Prompt" {
+            Key       = "HKLM:\SOFTWARE\Microsoft\ServerManager"
+            ValueName = "DoNotPopWACConsoleAtSMLaunch"
+            ValueData = "1"
+            ValueType = "Dword"
+        }
 
         Registry "Disable Network Profile Prompt" {
             Key       = 'HKLM:\System\CurrentControlSet\Control\Network\NewNetworkWindowOff'
@@ -206,7 +213,7 @@ configuration AKSHCIHost
         }
 
         Registry "DHCpConfigComplete" {
-            Key       = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\ServerManager\Roles\12'
+            Key       = 'HKLM:\SOFTWARE\Microsoft\ServerManager\Roles\12'
             ValueName = "ConfigurationState"
             ValueData = "2"
             ValueType = 'Dword'
