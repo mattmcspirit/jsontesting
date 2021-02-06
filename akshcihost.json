@@ -91,7 +91,7 @@
                 "Premium_LRS"
             ],
             "metadata": {
-                "description": "The Storage type of the VM data disk. If your VM contains an 's' in the VM size, you can select Premium_LRS storage for increased performance."
+                "description": "The Storage type of the VM data disk. If your VM contains an 's' in the VM size, you can select Premium_LRS storage for increased performance, but at a higher cost."
             }
         },
         "dataDiskSize": {
@@ -105,7 +105,7 @@
                 "1024"
             ],
             "metadata": {
-                "description": "The size of the individual data disks in GiB. 8 of these will be provisioned."
+                "description": "The size of the individual data disks in GiB. 8 of these will be provisioned therefore 64GiB is the recommended default."
             }
         },
         "adminUsername": {
