@@ -41,7 +41,7 @@ configuration AKSHCIHost
 
         Script StoragePool {
             SetScript  = {
-                New-StoragePool -FriendlyName AksHciPool -StorageSubSystemFriendlyName '*AksHciStorage*' -PhysicalDisks (Get-PhysicalDisk -CanPool $True)
+                New-StoragePool -FriendlyName AksHciPool -StorageSubSystemFriendlyName '*storage*' -PhysicalDisks (Get-PhysicalDisk -CanPool $true)
             }
             TestScript = {
                 (Get-StoragePool -ErrorAction SilentlyContinue -FriendlyName AksHciPool).OperationalStatus -eq 'OK'
@@ -50,7 +50,6 @@ configuration AKSHCIHost
                 @{Ensure = if ((Get-StoragePool -FriendlyName AksHciPool).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
             }
         }
-
         Script VirtualDisk {
             SetScript  = {
                 $disks = Get-StoragePool –FriendlyName AksHciPool -IsPrimordial $False | Get-PhysicalDisk
@@ -65,16 +64,15 @@ configuration AKSHCIHost
             }
             DependsOn  = "[Script]StoragePool"
         }
-
         Script FormatDisk {
             SetScript  = {
-                Get-VirtualDisk –FriendlyName AksHciDisk | Get-Disk | Initialize-Disk –Passthru | New-Partition -DriveLetter $targetDrive –UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciStorage –AllocationUnitSize 64KB -FileSystem NTFS
+                Get-VirtualDisk –FriendlyName AksHciDisk | Get-Disk | Initialize-Disk –Passthru | New-Partition -DriveLetter $targetDrive –UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData –AllocationUnitSize 64KB -FileSystem NTFS
             }
             TestScript = {
-                (Get-Volume -ErrorAction SilentlyContinue -filesystemlabel AksHciDisk).filesystem -EQ 'NTFS'
+                (get-volume -ErrorAction SilentlyContinue -filesystemlabel AksHciDisk).filesystem -EQ 'NTFS'
             }
             GetScript  = {
-                @{Ensure = if ((Get-Volume -filesystemlabel AksHciDisk).filesystem -EQ 'NTFS') { 'Present' } Else { 'Absent' } }
+                @{Ensure = if ((get-volume -filesystemlabel AksHciDisk).filesystem -EQ 'NTFS') { 'Present' } Else { 'Absent' } }
             }
             DependsOn  = "[Script]VirtualDisk"
         }
@@ -82,7 +80,7 @@ configuration AKSHCIHost
         File "folder-vms" {
             Type            = 'Directory'
             DestinationPath = $targetVMPath
-            DependsOn       = "[Script]StoragePool"
+            DependsOn       = "[Disk]dataDisk"
         }
 
         Registry "Disable Internet Explorer ESC for Admin" {
@@ -327,13 +325,17 @@ configuration AKSHCIHost
 
         Script installChoco {
             SetScript  = { 
-                Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+                Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
                 $env:path += ";C:\ProgramData\chocolatey\bin"
             }
             GetScript  = { @{} 
             }
             TestScript = { $false }
         }
+        
+        #cChocoInstaller InstallChoco {
+        #    InstallDir = "c:\choco"
+        #}
 
         cChocoFeature allowGlobalConfirmation {
             FeatureName = "allowGlobalConfirmation"
@@ -346,6 +348,15 @@ configuration AKSHCIHost
             Ensure      = 'Present'
             DependsOn   = '[Script]installChoco'
         }
+
+        <#
+        cChocoPackageInstaller "Install Chromium Edge" {
+            Name        = 'microsoft-edge'
+            Ensure      = 'Present'
+            AutoUpgrade = $true
+            DependsOn   = '[Script]installChoco'
+        }
+        #>
 
         Script installEdge {
             SetScript  = {
