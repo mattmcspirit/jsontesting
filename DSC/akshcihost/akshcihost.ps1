@@ -6,6 +6,8 @@ configuration AKSHCIHost
         [System.Management.Automation.PSCredential]$AdminCreds,
         [string]$enableDHCP,
         [string]$customRdpPort,
+        [Int]$RetryCount = 20,
+        [Int]$RetryIntervalSec = 30,
         [string]$vSwitchNameHost = "InternalNAT",
         [String]$targetDrive = "V",
         [String]$targetVMPath = "$targetDrive" + ":\VMs",
@@ -62,9 +64,16 @@ configuration AKSHCIHost
             }
             DependsOn  = "[Script]StoragePool"
         }
+        <#
         Script FormatDisk {
             SetScript  = {
-                Get-VirtualDisk -FriendlyName AksHciDisk | Get-Disk | Initialize-Disk -Passthru | New-Partition -DriveLetter $targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
+                $vDisk = Get-VirtualDisk -FriendlyName AksHciDisk
+                if ($vDisk | Get-Disk | Where-Object PartitionStyle -eq 'raw') {
+                    $vDisk | Get-Disk | Initialize-Disk -Passthru | New-Partition -DriveLetter $targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
+                }
+                elseif ($vDisk | Get-Disk | Where-Object PartitionStyle -eq 'GPT') {
+                    $vDisk | Get-Disk | New-Partition -DriveLetter $targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
+                }
             }
             TestScript = { 
                 (Get-Volume -ErrorAction SilentlyContinue -FileSystemLabel AksHciData).FileSystem -eq 'NTFS'
@@ -74,11 +83,44 @@ configuration AKSHCIHost
             }
             DependsOn  = "[Script]VirtualDisk"
         }
+        #>
+
+        Script getDisk {
+            SetScript  = {
+                if ((Test-Path -Path "$targetVMPath") -eq $false) {
+                    $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'RAW').UniqueId
+                    if ($getDisk -eq $null) {
+                        # Disk has already been formatted to GPT, so search for that disk instead:
+                        $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'GPT').UniqueId
+                    }
+                }
+            }
+            GetScript  = { @{} }
+            TestScript = { $false }
+            DependsOn  = "[Script]FormatDisk"
+        }
+
+        WaitforDisk Disk1 {
+            DiskID           = "$getDisk"
+            DiskIdType       = 'UniqueId'
+            RetryIntervalSec = $RetryIntervalSec
+            RetryCount       = $RetryCount
+            DependsOn   = "[Script]getDisk"
+        }
+
+        Disk dataDisk {
+            DiskID      = "$getDisk"
+            DiskIdType  = 'UniqueId'
+            DriveLetter = $targetDrive
+            FSFormat = 'NTFS'
+            AllocationUnitSize = 64KB
+            DependsOn   = "[WaitForDisk]Disk1"
+        }
 
         File "folder-vms" {
             Type            = 'Directory'
             DestinationPath = $targetVMPath
-            DependsOn       = "[Script]FormatDisk"
+            DependsOn       = "[Disk]dataDisk"
         }
 
         Registry "Disable Internet Explorer ESC for Admin" {
