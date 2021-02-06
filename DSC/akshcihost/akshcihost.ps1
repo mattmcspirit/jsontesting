@@ -97,7 +97,7 @@ configuration AKSHCIHost
             }
             GetScript  = { @{} }
             TestScript = { $false }
-            DependsOn  = "[Script]FormatDisk"
+            DependsOn  = "[Script]VirtualDisk"
         }
 
         WaitforDisk Disk1 {
