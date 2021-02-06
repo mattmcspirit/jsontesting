@@ -6,11 +6,9 @@ configuration AKSHCIHost
         [System.Management.Automation.PSCredential]$AdminCreds,
         [string]$enableDHCP,
         [string]$customRdpPort,
-        [Int]$RetryCount = 20,
-        [Int]$RetryIntervalSec = 30,
         [string]$vSwitchNameHost = "InternalNAT",
-        [String]$targetDrive = "V:",
-        [String]$targetVMPath = "$targetDrive\VMs",
+        [String]$targetDrive = "V",
+        [String]$targetVMPath = "$targetDrive" + ":\VMs",
         [String]$baseVHDFolderPath = "$targetVMPath\base"
     ) 
     
@@ -54,10 +52,10 @@ configuration AKSHCIHost
             SetScript  = {
                 $disks = Get-StoragePool –FriendlyName AksHciPool -IsPrimordial $False | Get-PhysicalDisk
                 $diskNum = $disks.Count
-                New-VirtualDisk –StoragePoolFriendlyName AksHciPool –FriendlyName AksHciDisk –ResiliencySettingName Simple -NumberOfColumns $diskNum –UseMaximumSize 
+                New-VirtualDisk –StoragePoolFriendlyName AksHciPool –FriendlyName AksHciDisk –ResiliencySettingName Simple -NumberOfColumns $diskNum –UseMaximumSize
             }
             TestScript = {
-                (Get-VirtualDisk -ErrorAction SilentlyContinue -friendlyName AksHciDisk).operationalSatus -EQ 'OK'
+                (Get-VirtualDisk -ErrorAction SilentlyContinue –FriendlyName AksHciDisk).OperationalStatus -eq 'OK'
             }
             GetScript  = {
                 @{Ensure = if ((Get-VirtualDisk -FriendlyName AksHciDisk).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
@@ -68,11 +66,11 @@ configuration AKSHCIHost
             SetScript  = {
                 Get-VirtualDisk –FriendlyName AksHciDisk | Get-Disk | Initialize-Disk –Passthru | New-Partition -DriveLetter $targetDrive –UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData –AllocationUnitSize 64KB -FileSystem NTFS
             }
-            TestScript = {
-                (get-volume -ErrorAction SilentlyContinue -filesystemlabel AksHciDisk).filesystem -EQ 'NTFS'
+            TestScript = { 
+                (Get-Volume -ErrorAction SilentlyContinue -FileSystemLabel AksHciData).FileSystem -eq 'NTFS'
             }
             GetScript  = {
-                @{Ensure = if ((get-volume -filesystemlabel AksHciDisk).filesystem -EQ 'NTFS') { 'Present' } Else { 'Absent' } }
+                @{Ensure = if ((Get-Volume -FileSystemLabel AksHciData).FileSystem -eq 'NTFS') { 'Present' } Else { 'Absent' } }
             }
             DependsOn  = "[Script]VirtualDisk"
         }
@@ -80,7 +78,7 @@ configuration AKSHCIHost
         File "folder-vms" {
             Type            = 'Directory'
             DestinationPath = $targetVMPath
-            DependsOn       = "[Disk]dataDisk"
+            DependsOn       = "[Script]FormatDisk"
         }
 
         Registry "Disable Internet Explorer ESC for Admin" {
@@ -325,7 +323,7 @@ configuration AKSHCIHost
 
         Script installChoco {
             SetScript  = { 
-                Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+                Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
                 $env:path += ";C:\ProgramData\chocolatey\bin"
             }
             GetScript  = { @{} 
