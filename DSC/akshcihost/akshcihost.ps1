@@ -37,6 +37,7 @@ configuration AKSHCIHost
             ConfigurationMode  = 'ApplyOnly'
         }
 
+        <#
         Script StoragePool {
             SetScript  = {
                 New-StoragePool -FriendlyName AksHciPool -StorageSubSystemFriendlyName '*storage*' -PhysicalDisks (Get-PhysicalDisk -CanPool $true)
@@ -74,6 +75,8 @@ configuration AKSHCIHost
             }
             DependsOn  = "[Script]VirtualDisk"
         }
+
+        #>
 
         File "folder-vms" {
             Type            = 'Directory'
