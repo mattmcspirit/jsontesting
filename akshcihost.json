@@ -392,10 +392,6 @@
                         },
                         "protectedSettings": {
                             "configurationArguments": {
-                                "AdminCreds": {
-                                    "UserName": "[parameters('adminUsername')]",
-                                    "Password": "[parameters('adminPassword')]"
-                                }
                             }
                         }
                     }

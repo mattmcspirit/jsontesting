@@ -3,7 +3,6 @@ configuration AKSHCIHost
     param 
     ( 
         [Parameter(Mandatory)]
-        [System.Management.Automation.PSCredential]$AdminCreds,
         [string]$enableDHCP,
         [string]$customRdpPort,
         [Int]$RetryCount = 20,
@@ -85,15 +84,9 @@ configuration AKSHCIHost
         }
         #>
 
-        Script getDisk {
+        Script getDiskId {
             SetScript  = {
-                if ((Test-Path -Path "$targetVMPath") -eq $false) {
-                    $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'RAW').UniqueId
-                    if ($getDisk -eq $null) {
-                        # Disk has already been formatted to GPT, so search for that disk instead:
-                        $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'GPT').UniqueId
-                    }
-                }
+                $getDiskId = (Get-VirtualDisk -FriendlyName AksHciDisk | Get-Disk).UniqueId
             }
             GetScript  = { @{} }
             TestScript = { $false }
@@ -101,17 +94,18 @@ configuration AKSHCIHost
         }
 
         WaitforDisk Disk1 {
-            DiskID           = "$getDisk"
+            DiskID           = "$getDiskId"
             DiskIdType       = 'UniqueId'
             RetryIntervalSec = $RetryIntervalSec
             RetryCount       = $RetryCount
-            DependsOn   = "[Script]getDisk"
+            DependsOn   = "[Script]getDiskId"
         }
 
         Disk dataDisk {
-            DiskID      = "$getDisk"
+            DiskID      = "$getDiskId"
             DiskIdType  = 'UniqueId'
             DriveLetter = $targetDrive
+            FSLabel = 'AksHciData'
             FSFormat = 'NTFS'
             AllocationUnitSize = 64KB
             DependsOn   = "[WaitForDisk]Disk1"
