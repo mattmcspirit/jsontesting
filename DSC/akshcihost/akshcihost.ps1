@@ -68,10 +68,10 @@ configuration AKSHCIHost
             SetScript  = {
                 $vDisk = Get-VirtualDisk -FriendlyName AksHciDisk
                 if ($vDisk | Get-Disk | Where-Object PartitionStyle -eq 'raw') {
-                    $vDisk | Get-Disk | Initialize-Disk -Passthru | New-Partition -DriveLetter $targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
+                    $vDisk | Get-Disk | Initialize-Disk -Passthru | New-Partition -DriveLetter $Using:targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
                 }
                 elseif ($vDisk | Get-Disk | Where-Object PartitionStyle -eq 'GPT') {
-                    $vDisk | Get-Disk | New-Partition -DriveLetter $targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
+                    $vDisk | Get-Disk | New-Partition -DriveLetter $Using:targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
                 }
             }
             TestScript = { 
