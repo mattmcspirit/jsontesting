@@ -37,7 +37,6 @@ configuration AKSHCIHost
             ConfigurationMode  = 'ApplyOnly'
         }
 
-        <#
         Script StoragePool {
             SetScript  = {
                 New-StoragePool -FriendlyName AksHciPool -StorageSubSystemFriendlyName '*storage*' -PhysicalDisks (Get-PhysicalDisk -CanPool $true)
@@ -51,12 +50,12 @@ configuration AKSHCIHost
         }
         Script VirtualDisk {
             SetScript  = {
-                $disks = Get-StoragePool –FriendlyName AksHciPool -IsPrimordial $False | Get-PhysicalDisk
+                $disks = Get-StoragePool -FriendlyName AksHciPool -IsPrimordial $False | Get-PhysicalDisk
                 $diskNum = $disks.Count
-                New-VirtualDisk –StoragePoolFriendlyName AksHciPool –FriendlyName AksHciDisk –ResiliencySettingName Simple -NumberOfColumns $diskNum –UseMaximumSize
+                New-VirtualDisk -StoragePoolFriendlyName AksHciPool -FriendlyName AksHciDisk -ResiliencySettingName Simple -NumberOfColumns $diskNum -UseMaximumSize
             }
             TestScript = {
-                (Get-VirtualDisk -ErrorAction SilentlyContinue –FriendlyName AksHciDisk).OperationalStatus -eq 'OK'
+                (Get-VirtualDisk -ErrorAction SilentlyContinue -FriendlyName AksHciDisk).OperationalStatus -eq 'OK'
             }
             GetScript  = {
                 @{Ensure = if ((Get-VirtualDisk -FriendlyName AksHciDisk).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
@@ -65,7 +64,7 @@ configuration AKSHCIHost
         }
         Script FormatDisk {
             SetScript  = {
-                Get-VirtualDisk –FriendlyName AksHciDisk | Get-Disk | Initialize-Disk –Passthru | New-Partition -DriveLetter $targetDrive –UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData –AllocationUnitSize 64KB -FileSystem NTFS
+                Get-VirtualDisk -FriendlyName AksHciDisk | Get-Disk | Initialize-Disk -Passthru | New-Partition -DriveLetter $targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
             }
             TestScript = { 
                 (Get-Volume -ErrorAction SilentlyContinue -FileSystemLabel AksHciData).FileSystem -eq 'NTFS'
@@ -75,8 +74,6 @@ configuration AKSHCIHost
             }
             DependsOn  = "[Script]VirtualDisk"
         }
-
-        #>
 
         File "folder-vms" {
             Type            = 'Directory'
