@@ -96,15 +96,16 @@
         },
         "dataDiskSize": {
             "type": "string",
-            "defaultValue": "512",
+            "defaultValue": "64",
             "allowedValues": [
+                "64",
                 "128",
                 "256",
                 "512",
                 "1024"
             ],
             "metadata": {
-                "description": "The size of the VM data disk in GiB. 512 GiB is recommended for AKS-HCI testing"
+                "description": "The size of the individual data disks in GiB. 8 of these will be provisioned."
             }
         },
         "adminUsername": {
@@ -298,7 +299,8 @@
         }
     },
     "variables": {
-        "dscUri": "https://github.com/mattmcspirit/jsontesting/raw/main/DSC/akshcihost.zip",
+        "dataDisksCount": 8,
+        "dscUri": "https://github.com/mattmcspirit/jsontesting/raw/StorageTests/DSC/akshcihost.zip",
         "randomGUID": "[substring(uniqueString(subscription().subscriptionId, resourceGroup().id, parameters('virtualMachineName')),0,6)]",
         "dnsNameForPublicIP": "[toLower(concat(parameters('virtualMachineName'), variables('randomGUID')))]",
         "virtualNetworkName": "AKSHCILabvNet",
@@ -347,15 +349,20 @@
                             "storageAccountType": "StandardSSD_LRS"
                         }
                     },
-                    "dataDisks": [
+                    "copy": [
                         {
-                            "createOption": "Empty",
-                            "managedDisk": {
-                                "storageAccountType": "[parameters('dataDiskType')]"
-                            },
-                            "caching": "ReadWrite",
-                            "diskSizeGB": "[parameters('dataDiskSize')]",
-                            "lun": 0
+                            "name": "dataDisks",
+                            "count": "[variables('dataDisksCount')]",
+                            "input": {
+                                "name": "[concat(parameters('virtualMachineName'),'DataDisk',copyIndex('dataDisks'))]",
+                                "diskSizeGB": "[parameters('dataDiskSize')]",
+                                "lun": "[copyIndex('dataDisks')]",
+                                "createOption": "Empty",
+                                "caching": "ReadWrite",
+                                "managedDisk": {
+                                    "storageAccountType": "[parameters('dataDiskType')]"
+                                }
+                            }
                         }
                     ]
                 },

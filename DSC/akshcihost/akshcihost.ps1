@@ -39,32 +39,50 @@ configuration AKSHCIHost
             ConfigurationMode  = 'ApplyOnly'
         }
 
-        if ((Test-Path -Path "$targetVMPath") -eq $false) {
-            $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'RAW').UniqueId
-            if ($getDisk -eq $null) {
-                # Disk has already been formatted to GPT, so search for that disk instead:
-                $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'GPT').UniqueId
+        Script StoragePool {
+            SetScript  = {
+                New-StoragePool -FriendlyName AksHciPool -StorageSubSystemFriendlyName '*AksHciStorage*' -PhysicalDisks (Get-PhysicalDisk -CanPool $True)
             }
+            TestScript = {
+                (Get-StoragePool -ErrorAction SilentlyContinue -FriendlyName AksHciPool).OperationalStatus -eq 'OK'
+            }
+            GetScript  = {
+                @{Ensure = if ((Get-StoragePool -FriendlyName AksHciPool).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
+            }
+        }
 
-            WaitforDisk Disk1 {
-                DiskID           = "$getDisk"
-                DiskIdType       = 'UniqueId'
-                RetryIntervalSec = $RetryIntervalSec
-                RetryCount       = $RetryCount
+        Script VirtualDisk {
+            SetScript  = {
+                $disks = Get-StoragePool –FriendlyName AksHciPool -IsPrimordial $False | Get-PhysicalDisk
+                $diskNum = $disks.Count
+                New-VirtualDisk –StoragePoolFriendlyName AksHciPool –FriendlyName AksHciDisk –ResiliencySettingName Simple -NumberOfColumns $diskNum –UseMaximumSize 
             }
+            TestScript = {
+                (Get-VirtualDisk -ErrorAction SilentlyContinue -friendlyName AksHciDisk).operationalSatus -EQ 'OK'
+            }
+            GetScript  = {
+                @{Ensure = if ((Get-VirtualDisk -FriendlyName AksHciDisk).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
+            }
+            DependsOn  = "[Script]StoragePool"
+        }
 
-            Disk dataDisk {
-                DiskID      = "$getDisk"
-                DiskIdType  = 'UniqueId'
-                DriveLetter = $targetDrive
-                DependsOn   = "[WaitForDisk]Disk1"
+        Script FormatDisk {
+            SetScript  = {
+                Get-VirtualDisk –FriendlyName AksHciDisk | Get-Disk | Initialize-Disk –Passthru | New-Partition -DriveLetter $targetDrive –UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciStorage –AllocationUnitSize 64KB -FileSystem NTFS
             }
+            TestScript = {
+                (Get-Volume -ErrorAction SilentlyContinue -filesystemlabel AksHciDisk).filesystem -EQ 'NTFS'
+            }
+            GetScript  = {
+                @{Ensure = if ((Get-Volume -filesystemlabel AksHciDisk).filesystem -EQ 'NTFS') { 'Present' } Else { 'Absent' } }
+            }
+            DependsOn  = "[Script]VirtualDisk"
+        }
 
-            File "folder-vms" {
-                Type            = 'Directory'
-                DestinationPath = $targetVMPath
-                DependsOn       = "[Disk]dataDisk"
-            }
+        File "folder-vms" {
+            Type            = 'Directory'
+            DestinationPath = $targetVMPath
+            DependsOn       = "[Script]StoragePool"
         }
 
         Registry "Disable Internet Explorer ESC for Admin" {
@@ -309,7 +327,7 @@ configuration AKSHCIHost
 
         Script installChoco {
             SetScript  = { 
-                Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+                Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
                 $env:path += ";C:\ProgramData\chocolatey\bin"
             }
             GetScript  = { @{} 
@@ -349,7 +367,7 @@ configuration AKSHCIHost
             GetScript  = { @{} 
             }
             TestScript = { $false }
-            DependsOn   = '[Script]installChoco'
+            DependsOn  = '[Script]installChoco'
         }
     }
 }
