@@ -63,7 +63,7 @@ configuration AKSHCIHost
             }
             DependsOn  = "[Script]StoragePool"
         }
-        <#
+        
         Script FormatDisk {
             SetScript  = {
                 $vDisk = Get-VirtualDisk -FriendlyName AksHciDisk
@@ -82,23 +82,15 @@ configuration AKSHCIHost
             }
             DependsOn  = "[Script]VirtualDisk"
         }
-        #>
 
-        Script getDiskId {
-            SetScript  = {
-                $getDiskId = (Get-VirtualDisk -FriendlyName AksHciDisk | Get-Disk).UniqueId
-            }
-            GetScript  = { @{} }
-            TestScript = { $false }
-            DependsOn  = "[Script]VirtualDisk"
-        }
+        <#
 
         WaitforDisk Disk1 {
             DiskID           = "$getDiskId"
             DiskIdType       = 'UniqueId'
             RetryIntervalSec = $RetryIntervalSec
             RetryCount       = $RetryCount
-            DependsOn   = "[Script]getDiskId"
+            DependsOn   = "[Script]FormatDisk"
         }
 
         Disk dataDisk {
@@ -111,10 +103,12 @@ configuration AKSHCIHost
             DependsOn   = "[WaitForDisk]Disk1"
         }
 
+        #>
+
         File "folder-vms" {
             Type            = 'Directory'
             DestinationPath = $targetVMPath
-            DependsOn       = "[Disk]dataDisk"
+            DependsOn       = "[Script]FormatDisk"
         }
 
         Registry "Disable Internet Explorer ESC for Admin" {
