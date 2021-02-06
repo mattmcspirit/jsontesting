@@ -205,6 +205,14 @@ configuration AKSHCIHost
             DependsOn = "[WindowsFeature]Install DHCPServer"
         }
 
+        Registry "DHCpConfigComplete" {
+            Key       = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\ServerManager\Roles\12'
+            ValueName = "ConfigurationState"
+            ValueData = "2"
+            ValueType = 'Dword'
+            DependsOn = "[WindowsFeature]DHCPTools"
+        }
+
         WindowsFeature "Hyper-V" {
             Name   = "Hyper-V"
             Ensure = "Present"
@@ -343,7 +351,7 @@ configuration AKSHCIHost
         Script SetDHCPDNSSetting {
             SetScript  = { 
                 Set-DhcpServerv4DnsSetting -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True -UpdateDnsRRForOlderClients $True -DisableDnsPtrRRUpdate $false
-                Write-Verbose -Verbose "Setting server level DNS dynamic update configuration settings" 
+                Write-Verbose -Verbose "Setting server level DNS dynamic update configuration settings"
             }
             GetScript  = { @{} 
             }
