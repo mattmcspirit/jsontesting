@@ -83,28 +83,6 @@ configuration AKSHCIHost
             DependsOn  = "[Script]VirtualDisk"
         }
 
-        <#
-
-        WaitforDisk Disk1 {
-            DiskID           = "$getDiskId"
-            DiskIdType       = 'UniqueId'
-            RetryIntervalSec = $RetryIntervalSec
-            RetryCount       = $RetryCount
-            DependsOn   = "[Script]FormatDisk"
-        }
-
-        Disk dataDisk {
-            DiskID      = "$getDiskId"
-            DiskIdType  = 'UniqueId'
-            DriveLetter = $targetDrive
-            FSLabel = 'AksHciData'
-            FSFormat = 'NTFS'
-            AllocationUnitSize = 64KB
-            DependsOn   = "[WaitForDisk]Disk1"
-        }
-
-        #>
-
         File "folder-vms" {
             Type            = 'Directory'
             DestinationPath = $targetVMPath
