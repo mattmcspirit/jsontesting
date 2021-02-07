@@ -4,84 +4,76 @@
     "parameters": {
         "virtualMachineName": {
             "type": "string",
-            "defaultValue": "AKSHCIHost001"
+            "defaultValue": "AKSHCIHost001",
+            "metadata": {
+                "description": "Keep the VM name to less than 15 characters"
+            }
         },
         "virtualMachineSize": {
             "type": "string",
             "defaultValue": "Standard_E16s_v4",
             "allowedValues": [
-                "Standard_D4_v3",
-                "Standard_D8_v3",
-                "Standard_D16_v3",
-                "Standard_D32_v3",
-                "Standard_D64_v3",
-                "Standard_D4s_v3",
-                "Standard_D8s_v3",
                 "Standard_D16s_v3",
                 "Standard_D32s_v3",
                 "Standard_D64s_v3",
-                "Standard_D4_v4",
-                "Standard_D8_v4",
-                "Standard_D16_v4",
-                "Standard_D32_v4",
-                "Standard_D64_v4",
-                "Standard_D4s_v4",
-                "Standard_D8s_v4",
                 "Standard_D16s_v4",
                 "Standard_D32s_v4",
                 "Standard_D64s_v4",
-                "Standard_D4d_v4",
-                "Standard_D8d_v4",
                 "Standard_D16d_v4",
                 "Standard_D32d_v4",
                 "Standard_D64d_v4",
-                "Standard_D4ds_v4",
-                "Standard_D8ds_v4",
                 "Standard_D16ds_v4",
                 "Standard_D32ds_v4",
                 "Standard_D64ds_v4",
-                "Standard_E4_v3",
-                "Standard_E8_v3",
-                "Standard_E16_v3",
-                "Standard_E32_v3",
-                "Standard_E64_v3",
                 "Standard_E8s_v3",
                 "Standard_E16s_v3",
+                "Standard_E16-4s_v3",
+                "Standard_E16-8s_v3",
+                "Standard_E20s_v3",
+                "Standard_E32s_v3",
                 "Standard_E32-8s_v3",
                 "Standard_E32-16s_v3",
-                "Standard_E32s_v3",
+                "Standard_E48s_v3",
+                "Standard_E64s_v3",
                 "Standard_E64-16s_v3",
                 "Standard_E64-32s_v3",
-                "Standard_E64s_v3",
-                "Standard_E4_v4",
-                "Standard_E8_v4",
-                "Standard_E16_v4",
-                "Standard_E20_v4",
-                "Standard_E32_v4",
-                "Standard_E48_v4",
-                "Standard_E64_v4",
-                "Standard_E4s_v4",
                 "Standard_E8s_v4",
                 "Standard_E16s_v4",
+                "Standard_E16-8s_v4",
                 "Standard_E20s_v4",
                 "Standard_E32s_v4",
+                "Standard_E32-8s_v4",
+                "Standard_E32-16s_v4",
                 "Standard_E48s_v4",
                 "Standard_E64s_v4",
-                "Standard_E4d_v4",
+                "Standard_E64-16s_v4",
+                "Standard_E64-32s_v4",
                 "Standard_E8d_v4",
                 "Standard_E16d_v4",
                 "Standard_E20d_v4",
                 "Standard_E32d_v4",
                 "Standard_E48d_v4",
                 "Standard_E64d_v4",
-                "Standard_E4ds_v4",
                 "Standard_E8ds_v4",
                 "Standard_E16ds_v4",
                 "Standard_E20ds_v4",
                 "Standard_E32ds_v4",
                 "Standard_E48ds_v4",
-                "Standard_E64ds_v4"
+                "Standard_E64ds_v4",
+                "Standard_E64-16ds_v4",
+                "Standard_E64-32ds_v4"
             ]
+        },
+        "virtualMachineGeneration": {
+            "type": "string",
+            "defaultValue": "Generation 2",
+            "allowedValues": [
+                "Generation 1",
+                "Generation 2"
+            ],
+            "metadata": {
+                "description": "Select your VM generation, ideally Gen 2. Not all Azure regions support Gen 2 VMs."
+            }
         },
         "dataDiskType": {
             "type": "string",
@@ -91,20 +83,21 @@
                 "Premium_LRS"
             ],
             "metadata": {
-                "description": "The Storage type of the VM data disk. If your VM contains an 's' in the VM size, you can select Premium_LRS storage for increased performance."
+                "description": "The Storage type of the VM data disk. If your VM contains an 's' in the VM size, you can select Premium_LRS storage for increased performance, but at a higher cost."
             }
         },
         "dataDiskSize": {
             "type": "string",
-            "defaultValue": "512",
+            "defaultValue": "64",
             "allowedValues": [
+                "64",
                 "128",
                 "256",
                 "512",
                 "1024"
             ],
             "metadata": {
-                "description": "The size of the VM data disk in GiB. 512 GiB is recommended for AKS-HCI testing"
+                "description": "The size of the individual data disks in GiB. 8 of these will be provisioned therefore 64GiB is the recommended default."
             }
         },
         "adminUsername": {
@@ -298,6 +291,7 @@
         }
     },
     "variables": {
+        "dataDisksCount": 8,
         "dscUri": "https://github.com/mattmcspirit/jsontesting/raw/main/DSC/akshcihost.zip",
         "randomGUID": "[substring(uniqueString(subscription().subscriptionId, resourceGroup().id, parameters('virtualMachineName')),0,6)]",
         "dnsNameForPublicIP": "[toLower(concat(parameters('virtualMachineName'), variables('randomGUID')))]",
@@ -338,7 +332,7 @@
                     "imageReference": {
                         "publisher": "MicrosoftWindowsServer",
                         "offer": "WindowsServer",
-                        "sku": "2019-Datacenter",
+                        "sku": "[if(equals(parameters('virtualMachineGeneration'), 'Generation 2'), '2019-datacenter-gensecond', '2019-Datacenter')]",
                         "version": "latest"
                     },
                     "osDisk": {
@@ -347,15 +341,20 @@
                             "storageAccountType": "StandardSSD_LRS"
                         }
                     },
-                    "dataDisks": [
+                    "copy": [
                         {
-                            "createOption": "Empty",
-                            "managedDisk": {
-                                "storageAccountType": "[parameters('dataDiskType')]"
-                            },
-                            "caching": "ReadWrite",
-                            "diskSizeGB": "[parameters('dataDiskSize')]",
-                            "lun": 0
+                            "name": "dataDisks",
+                            "count": "[variables('dataDisksCount')]",
+                            "input": {
+                                "name": "[concat(parameters('virtualMachineName'),'DataDisk',copyIndex('dataDisks'))]",
+                                "diskSizeGB": "[parameters('dataDiskSize')]",
+                                "lun": "[copyIndex('dataDisks')]",
+                                "createOption": "Empty",
+                                "caching": "None",
+                                "managedDisk": {
+                                    "storageAccountType": "[parameters('dataDiskType')]"
+                                }
+                            }
                         }
                     ]
                 },
@@ -396,10 +395,6 @@
                         },
                         "protectedSettings": {
                             "configurationArguments": {
-                                "AdminCreds": {
-                                    "UserName": "[parameters('adminUsername')]",
-                                    "Password": "[parameters('adminPassword')]"
-                                }
                             }
                         }
                     }
