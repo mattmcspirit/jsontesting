@@ -3,14 +3,13 @@ configuration AKSHCIHost
     param 
     ( 
         [Parameter(Mandatory)]
-        [System.Management.Automation.PSCredential]$AdminCreds,
         [string]$enableDHCP,
         [string]$customRdpPort,
         [Int]$RetryCount = 20,
         [Int]$RetryIntervalSec = 30,
         [string]$vSwitchNameHost = "InternalNAT",
-        [String]$targetDrive = "V:",
-        [String]$targetVMPath = "$targetDrive\VMs",
+        [String]$targetDrive = "V",
+        [String]$targetVMPath = "$targetDrive" + ":\VMs",
         [String]$baseVHDFolderPath = "$targetVMPath\base"
     ) 
     
@@ -39,32 +38,55 @@ configuration AKSHCIHost
             ConfigurationMode  = 'ApplyOnly'
         }
 
-        if ((Test-Path -Path "$targetVMPath") -eq $false) {
-            $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'RAW').UniqueId
-            if ($getDisk -eq $null) {
-                # Disk has already been formatted to GPT, so search for that disk instead:
-                $getDisk = (Get-Disk | Where-Object PartitionStyle -eq 'GPT').UniqueId
+        Script StoragePool {
+            SetScript  = {
+                New-StoragePool -FriendlyName AksHciPool -StorageSubSystemFriendlyName '*storage*' -PhysicalDisks (Get-PhysicalDisk -CanPool $true)
             }
+            TestScript = {
+                (Get-StoragePool -ErrorAction SilentlyContinue -FriendlyName AksHciPool).OperationalStatus -eq 'OK'
+            }
+            GetScript  = {
+                @{Ensure = if ((Get-StoragePool -FriendlyName AksHciPool).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
+            }
+        }
+        Script VirtualDisk {
+            SetScript  = {
+                $disks = Get-StoragePool -FriendlyName AksHciPool -IsPrimordial $False | Get-PhysicalDisk
+                $diskNum = $disks.Count
+                New-VirtualDisk -StoragePoolFriendlyName AksHciPool -FriendlyName AksHciDisk -ResiliencySettingName Simple -NumberOfColumns $diskNum -UseMaximumSize
+            }
+            TestScript = {
+                (Get-VirtualDisk -ErrorAction SilentlyContinue -FriendlyName AksHciDisk).OperationalStatus -eq 'OK'
+            }
+            GetScript  = {
+                @{Ensure = if ((Get-VirtualDisk -FriendlyName AksHciDisk).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
+            }
+            DependsOn  = "[Script]StoragePool"
+        }
+        
+        Script FormatDisk {
+            SetScript  = {
+                $vDisk = Get-VirtualDisk -FriendlyName AksHciDisk
+                if ($vDisk | Get-Disk | Where-Object PartitionStyle -eq 'raw') {
+                    $vDisk | Get-Disk | Initialize-Disk -Passthru | New-Partition -DriveLetter $Using:targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
+                }
+                elseif ($vDisk | Get-Disk | Where-Object PartitionStyle -eq 'GPT') {
+                    $vDisk | Get-Disk | New-Partition -DriveLetter $Using:targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
+                }
+            }
+            TestScript = { 
+                (Get-Volume -ErrorAction SilentlyContinue -FileSystemLabel AksHciData).FileSystem -eq 'NTFS'
+            }
+            GetScript  = {
+                @{Ensure = if ((Get-Volume -FileSystemLabel AksHciData).FileSystem -eq 'NTFS') { 'Present' } Else { 'Absent' } }
+            }
+            DependsOn  = "[Script]VirtualDisk"
+        }
 
-            WaitforDisk Disk1 {
-                DiskID           = "$getDisk"
-                DiskIdType       = 'UniqueId'
-                RetryIntervalSec = $RetryIntervalSec
-                RetryCount       = $RetryCount
-            }
-
-            Disk dataDisk {
-                DiskID      = "$getDisk"
-                DiskIdType  = 'UniqueId'
-                DriveLetter = $targetDrive
-                DependsOn   = "[WaitForDisk]Disk1"
-            }
-
-            File "folder-vms" {
-                Type            = 'Directory'
-                DestinationPath = $targetVMPath
-                DependsOn       = "[Disk]dataDisk"
-            }
+        File "folder-vms" {
+            Type            = 'Directory'
+            DestinationPath = $targetVMPath
+            DependsOn       = "[Script]FormatDisk"
         }
 
         Registry "Disable Internet Explorer ESC for Admin" {
@@ -86,6 +108,13 @@ configuration AKSHCIHost
             ValueName = "https"
             ValueData = "1"
             ValueType = 'Dword'
+        }
+        
+        Registry "Disable Server Manager WAC Prompt" {
+            Key       = "HKLM:\SOFTWARE\Microsoft\ServerManager"
+            ValueName = "DoNotPopWACConsoleAtSMLaunch"
+            ValueData = "1"
+            ValueType = "Dword"
         }
 
         Registry "Disable Network Profile Prompt" {
@@ -159,6 +188,14 @@ configuration AKSHCIHost
             Ensure    = "Present"
             Name      = "RSAT-DHCP"
             DependsOn = "[WindowsFeature]Install DHCPServer"
+        }
+
+        Registry "DHCpConfigComplete" {
+            Key       = 'HKLM:\SOFTWARE\Microsoft\ServerManager\Roles\12'
+            ValueName = "ConfigurationState"
+            ValueData = "2"
+            ValueType = 'Dword'
+            DependsOn = "[WindowsFeature]DHCPTools"
         }
 
         WindowsFeature "Hyper-V" {
@@ -299,7 +336,7 @@ configuration AKSHCIHost
         Script SetDHCPDNSSetting {
             SetScript  = { 
                 Set-DhcpServerv4DnsSetting -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True -UpdateDnsRRForOlderClients $True -DisableDnsPtrRRUpdate $false
-                Write-Verbose -Verbose "Setting server level DNS dynamic update configuration settings" 
+                Write-Verbose -Verbose "Setting server level DNS dynamic update configuration settings"
             }
             GetScript  = { @{} 
             }
@@ -309,7 +346,7 @@ configuration AKSHCIHost
 
         Script installChoco {
             SetScript  = { 
-                Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+                Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
                 $env:path += ";C:\ProgramData\chocolatey\bin"
             }
             GetScript  = { @{} 
@@ -349,7 +386,7 @@ configuration AKSHCIHost
             GetScript  = { @{} 
             }
             TestScript = { $false }
-            DependsOn   = '[Script]installChoco'
+            DependsOn  = '[Script]installChoco'
         }
     }
 }
