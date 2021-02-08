@@ -108,6 +108,7 @@ configuration AKSHCIHost
 
         Registry "Disable Internet Explorer ESC for Admin" {
             Key       = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"
+            Ensure    = 'Present'
             ValueName = "IsInstalled"
             ValueData = "0"
             ValueType = "Dword"
@@ -115,6 +116,7 @@ configuration AKSHCIHost
 
         Registry "Disable Internet Explorer ESC for User" {
             Key       = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}"
+            Ensure    = 'Present'
             ValueName = "IsInstalled"
             ValueData = "0"
             ValueType = "Dword"
@@ -122,6 +124,7 @@ configuration AKSHCIHost
 
         Registry "Add Wac to Intranet zone for SSO" {
             Key       = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\EscDomains\wac'
+            Ensure    = 'Present'
             ValueName = "https"
             ValueData = "1"
             ValueType = 'Dword'
@@ -129,6 +132,7 @@ configuration AKSHCIHost
         
         Registry "Disable Server Manager WAC Prompt" {
             Key       = "HKLM:\SOFTWARE\Microsoft\ServerManager"
+            Ensure    = 'Present'
             ValueName = "DoNotPopWACConsoleAtSMLaunch"
             ValueData = "1"
             ValueType = "Dword"
@@ -138,6 +142,22 @@ configuration AKSHCIHost
             Key       = 'HKLM:\System\CurrentControlSet\Control\Network\NewNetworkWindowOff'
             Ensure    = 'Present'
             ValueName = ''
+        }
+
+        Registry "SetWorkgroupDomain" {
+            Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\"
+            Ensure    = 'Present'
+            ValueName = "Domain"
+            ValueData = "akshci.local"
+            ValueType = "String"
+        }
+
+        Registry "SetWorkgroupNVDomain" {
+            Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\"
+            Ensure    = 'Present'
+            ValueName = "NV Domain"
+            ValueData = "akshci.local"
+            ValueType = "String"
         }
 
         # CredSSP Registry Settings
@@ -392,6 +412,17 @@ configuration AKSHCIHost
             DependsOn       = "[xDnsServerPrimaryZone]SetReverseLookupZone"
         }
 
+        Script SetDHCPDNSSetting {
+            SetScript  = { 
+                Set-DhcpServerv4DnsSetting -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True -UpdateDnsRRForOlderClients $True -DisableDnsPtrRRUpdate $false
+                Write-Verbose -Verbose "Setting server level DNS dynamic update configuration settings"
+            }
+            GetScript  = { @{} 
+            }
+            TestScript = { $false }
+            DependsOn  = "[xDnsServerSetting]SetListener"
+        }
+
         # Set DNS Clients on Host
 
         DnsServerAddress "DnsServerAddress for HostNic"
@@ -422,17 +453,6 @@ configuration AKSHCIHost
             InterfaceAlias           = "vEthernet `($vSwitchNameHost`)"
             ConnectionSpecificSuffix = 'akshci.local'
             DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
-        }
-
-        Script SetDHCPDNSSetting {
-            SetScript  = { 
-                Set-DhcpServerv4DnsSetting -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True -UpdateDnsRRForOlderClients $True -DisableDnsPtrRRUpdate $false
-                Write-Verbose -Verbose "Setting server level DNS dynamic update configuration settings"
-            }
-            GetScript  = { @{} 
-            }
-            TestScript = { $false }
-            DependsOn  = "[xDnsServerSetting]SetListener"
         }
 
         # CredSSP & WinRM Fixes
