@@ -262,6 +262,7 @@ configuration AKSHCIHost
         WindowsFeature "Hyper-V" {
             Name   = "Hyper-V"
             Ensure = "Present"
+            DependsOn  = "[Registry]NewCredSSPKey3"
         }
 
         WindowsFeature "RSAT-Hyper-V-Tools" {
@@ -460,13 +461,13 @@ configuration AKSHCIHost
         xCredSSP Server {
             Ensure    = "Present"
             Role      = "Server"
-            DependsOn = "[Registry]NewCredSSPkey"
+            DependsOn = "[DnsConnectionSuffix]AddSpecificSuffixNATNic"
         }
         xCredSSP Client {
             Ensure            = "Present"
             Role              = "Client"
             DelegateComputers = "$env:COMPUTERNAME"
-            DependsOn         = "[Registry]NewCredSSPkey"
+            DependsOn         = "[xCredSSP]Server"
         }
 
         Script ConfigureWinRM {
