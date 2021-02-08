@@ -24,6 +24,7 @@ configuration AKSHCIHost
     Import-DscResource -ModuleName 'xDNSServer'
     Import-DscResource -ModuleName 'cChoco'
     Import-DscResource -ModuleName 'DSCR_Shortcut'
+    Import-DscResource -ModuleName 'xCredSSP'
 
     if ($enableDHCP -eq "Enabled") {
         $dhcpStatus = "Active"
@@ -83,10 +84,26 @@ configuration AKSHCIHost
             DependsOn  = "[Script]VirtualDisk"
         }
 
-        File "folder-vms" {
+        File "VMfolder" {
             Type            = 'Directory'
             DestinationPath = $targetVMPath
             DependsOn       = "[Script]FormatDisk"
+        }
+
+        Script defenderExclusions {
+            SetScript  = {
+                $exclusionPath = "$Using:targetDrive" + ":\"
+                Add-MpPreference -ExclusionPath "$exclusionPath"               
+            }
+            TestScript = {
+                $exclusionPath = "$Using:targetDrive" + ":\"
+                (Get-MpPreference).ExclusionPath -contains "$exclusionPath"
+            }
+            GetScript  = {
+                $exclusionPath = "$Using:targetDrive" + ":\"
+                @{Ensure = if ((Get-MpPreference).ExclusionPath -contains "$exclusionPath") { 'Present' } Else { 'Absent' } }
+            }
+            DependsOn  = "[File]VMfolder"
         }
 
         Registry "Disable Internet Explorer ESC for Admin" {
@@ -121,6 +138,16 @@ configuration AKSHCIHost
             Key       = 'HKLM:\System\CurrentControlSet\Control\Network\NewNetworkWindowOff'
             Ensure    = 'Present'
             ValueName = ''
+        }
+
+        # CredSSP Registry Settings
+
+        Registry "NewCredSSPKey" {
+            Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
+            Ensure    = 'Present'
+            ValueName = '1'
+            ValueData = '*.akshci.local'
+            ValueType = "Dword"
         }
 
         if ($customRdpPort -ne "3389") {
@@ -230,10 +257,25 @@ configuration AKSHCIHost
             DependsOn = "[WindowsFeature]Hyper-V"
         }
 
-        NetConnectionProfile SetPublicEnableInternet
+        NetConnectionProfile SetProfile
         {
             InterfaceAlias  = 'Ethernet'
             NetworkCategory = 'Private'
+        }
+
+        NetAdapterBinding DisableIPv6Host
+        {
+            InterfaceAlias = 'Ethernet'
+            ComponentId    = 'ms_tcpip6'
+            State          = 'Disabled'
+        }
+
+        NetAdapterBinding DisableIPv6NAT
+        {
+            InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
+            ComponentId    = 'ms_tcpip6'
+            State          = 'Disabled'
+            DependsOn      = "[xVMSwitch]$vSwitchNameHost"
         }
 
         IPAddress "New IP for vEthernet $vSwitchNameHost"
@@ -259,13 +301,7 @@ configuration AKSHCIHost
             DependsOn = "[NetIPInterface]Enable IP forwarding on vEthernet $vSwitchNameHost"
         }
 
-        DnsServerAddress "DnsServerAddress for vEthernet $vSwitchNameHost" 
-        { 
-            Address        = '172.0.0.1' 
-            InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
-            AddressFamily  = 'IPv4'
-            DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
-        }
+        # Configure DHCP
 
         xDhcpServerScope "AksHciDhcpScope" { 
             Ensure        = 'Present'
@@ -310,6 +346,15 @@ configuration AKSHCIHost
             DependsOn  = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
         }
 
+        NetConnectionProfile SetProfileNAT
+        {
+            InterfaceAlias  = "vEthernet `($vSwitchNameHost`)"
+            NetworkCategory = 'Private'
+            DependsOn       = "[script]NAT"
+        }
+
+        # Configure DNS Server
+
         xDnsServerPrimaryZone SetPrimaryDNSZone {
             Name          = 'akshci.local'
             Ensure        = 'Present'
@@ -333,6 +378,38 @@ configuration AKSHCIHost
             DependsOn       = "[xDnsServerPrimaryZone]SetReverseLookupZone"
         }
 
+        # Set DNS Clients on Host
+
+        DnsServerAddress "DnsServerAddress for HostNic"
+        { 
+            Address        = '192.168.0.1'
+            InterfaceAlias = "Ethernet"
+            AddressFamily  = 'IPv4'
+            DependsOn      = @("[WindowsFeature]DNS", "[Script]NAT", "[xDnsServerSetting]SetListener")
+        }
+
+        DnsServerAddress "DnsServerAddress for NATNic" 
+        { 
+            Address        = '192.168.0.1'
+            InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
+            AddressFamily  = 'IPv4'
+            DependsOn      = @("[WindowsFeature]DNS", "[IPAddress]New IP for vEthernet $vSwitchNameHost", "[xDnsServerSetting]SetListener")
+        }
+
+        DnsConnectionSuffix AddSpecificSuffixHostNic
+        {
+            InterfaceAlias           = 'Ethernet'
+            ConnectionSpecificSuffix = 'akshci.local'
+            DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
+        }
+
+        DnsConnectionSuffix AddSpecificSuffixNATNic
+        {
+            InterfaceAlias           = "vEthernet `($vSwitchNameHost`)"
+            ConnectionSpecificSuffix = 'akshci.local'
+            DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
+        }
+
         Script SetDHCPDNSSetting {
             SetScript  = { 
                 Set-DhcpServerv4DnsSetting -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True -UpdateDnsRRForOlderClients $True -DisableDnsPtrRRUpdate $false
@@ -343,6 +420,35 @@ configuration AKSHCIHost
             TestScript = { $false }
             DependsOn  = "[xDnsServerSetting]SetListener"
         }
+
+        # CredSSP & WinRM Fixes
+
+        xCredSSP Server {
+            Ensure    = "Present"
+            Role      = "Server"
+            DependsOn = "[Registry]NewCredSSPkey"
+        }
+        xCredSSP Client {
+            Ensure            = "Present"
+            Role              = "Client"
+            DelegateComputers = "$env:COMPUTERNAME"
+            DependsOn         = "[Registry]NewCredSSPkey"
+        }
+
+        Script ConfigureWinRM {
+            SetScript  = {
+                Set-Item WSMan:\localhost\Client\TrustedHosts '*.akshci.local' -Force
+            }
+            TestScript = {
+                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains '*.akshci.local'
+            }
+            GetScript  = {
+                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains '*.akshci.local') { 'Present' } Else { 'Absent' } }
+            }
+            DependsOn  = "[xCredSSP]Client"
+        }
+
+        # Install Choco
 
         Script installChoco {
             SetScript  = { 
