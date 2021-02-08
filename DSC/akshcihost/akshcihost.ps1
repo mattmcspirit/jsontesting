@@ -145,9 +145,23 @@ configuration AKSHCIHost
         Registry "NewCredSSPKey" {
             Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
             Ensure    = 'Present'
+            ValueName = ''
+        }
+
+        Registry "NewCredSSPKey2" {
+            Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\'
+            ValueName = 'AllowFreshCredentialsWhenNTLMOnly'
+            ValueData = '1'
+            ValueType = "Dword"
+            DependsOn  = "[Registry]NewCredSSPKey"
+        }
+
+        Registry "NewCredSSPKey3" {
+            Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
             ValueName = '1'
             ValueData = '*.akshci.local'
-            ValueType = "Dword"
+            ValueType = "String"
+            DependsOn  = "[Registry]NewCredSSPKey2"
         }
 
         if ($customRdpPort -ne "3389") {
