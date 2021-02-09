@@ -322,7 +322,7 @@ configuration AKSHCIHost
             DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
         }
 
-        NetAdapterRdma "Enable RDMA on vEthernet $vSwitchNameHost"
+        NetAdapterRdma "EnableRDMAonvEthernet"
         {
             Name      = "vEthernet `($vSwitchNameHost`)"
             Enabled   = $true
@@ -348,7 +348,7 @@ configuration AKSHCIHost
         {
             InterfaceAlias  = "vEthernet `($vSwitchNameHost`)"
             NetworkCategory = 'Private'
-            DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
+            DependsOn      = "[NetAdapterRdma]EnableRDMAonvEthernet"
         }
 
         NetAdapterBinding DisableIPv6NAT
