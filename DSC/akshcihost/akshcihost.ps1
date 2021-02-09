@@ -476,7 +476,7 @@ configuration AKSHCIHost
             DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
         }
 
-        #### STAGE 2h - CONFIGURE CREDSSP & WINRM
+        #### STAGE 2h - CONFIGURE CREDSSP & WinRM
 
         xCredSSP Server {
             Ensure         = "Present"
@@ -491,7 +491,7 @@ configuration AKSHCIHost
             DependsOn         = "[xCredSSP]Server"
         }
 
-        #### STAGE 3a - CONFIGURE WINRM
+        #### STAGE 3a - CONFIGURE WinRM
 
         Script ConfigureWinRM {
             SetScript  = {
