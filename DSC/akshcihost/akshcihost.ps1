@@ -5,6 +5,7 @@ configuration AKSHCIHost
         [Parameter(Mandatory)]
         [string]$enableDHCP,
         [string]$customRdpPort,
+        [string]$domain = "akshci.local",
         [Int]$RetryCount = 20,
         [Int]$RetryIntervalSec = 30,
         [string]$vSwitchNameHost = "InternalNAT",
@@ -179,7 +180,7 @@ configuration AKSHCIHost
         Registry "NewCredSSPKey3" {
             Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
             ValueName = '1'
-            ValueData = '*.akshci.local'
+            ValueData = "*.$domain"
             ValueType = "String"
             DependsOn  = "[Registry]NewCredSSPKey2"
         }
@@ -466,19 +467,19 @@ configuration AKSHCIHost
         xCredSSP Client {
             Ensure            = "Present"
             Role              = "Client"
-            DelegateComputers = "$env:COMPUTERNAME"
+            DelegateComputers = "$env:COMPUTERNAME" + ".$domain"
             DependsOn         = "[xCredSSP]Server"
         }
 
         Script ConfigureWinRM {
             SetScript  = {
-                Set-Item WSMan:\localhost\Client\TrustedHosts '*.akshci.local' -Force
+                Set-Item WSMan:\localhost\Client\TrustedHosts "*.$domain" -Force
             }
             TestScript = {
-                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains '*.akshci.local'
+                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$domain"
             }
             GetScript  = {
-                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains '*.akshci.local') { 'Present' } Else { 'Absent' } }
+                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$domain") { 'Present' } Else { 'Absent' } }
             }
             DependsOn  = "[xCredSSP]Client"
         }
