@@ -562,13 +562,13 @@ configuration AKSHCIHost
         cChocoFeature allowGlobalConfirmation {
             FeatureName = "allowGlobalConfirmation"
             Ensure      = 'Present'
-            DependsOn   = '[Script]installChoco'
+            DependsOn   = '[cChocoInstaller]installChoco'
         }
 
         cChocoFeature useRememberedArgumentsForUpgrades {
             FeatureName = "useRememberedArgumentsForUpgrades"
             Ensure      = 'Present'
-            DependsOn   = '[Script]installChoco'
+            DependsOn   = '[cChocoInstaller]installChoco'
         }
 
         <#
