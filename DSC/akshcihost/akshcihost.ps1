@@ -476,7 +476,6 @@ configuration AKSHCIHost
             DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
         }
 
-        <#
         #### STAGE 2h - CONFIGURE CREDSSP & WINRM
 
         xCredSSP Server {
@@ -506,8 +505,6 @@ configuration AKSHCIHost
             }
             DependsOn  = "[xCredSSP]Client"
         }
-
-        #>
 
         #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
 
