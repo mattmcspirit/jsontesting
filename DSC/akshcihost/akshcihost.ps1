@@ -484,17 +484,17 @@ configuration AKSHCIHost
             Ensure         = "Present"
             Role           = "Server"
             DependsOn      = "[DnsConnectionSuffix]AddSpecificSuffixNATNic"
-            SuppressReboot = $True
+            SuppressReboot = $true
         }
         xCredSSP Client {
             Ensure            = "Present"
             Role              = "Client"
             DelegateComputers = "$env:COMPUTERNAME" + ".$domain"
             DependsOn         = "[xCredSSP]Server"
+            SuppressReboot    = $true
         }
 
         <#
-
         #### STAGE 3a - CONFIGURE WinRM
 
         Script ConfigureWinRM {
@@ -509,7 +509,6 @@ configuration AKSHCIHost
             }
             DependsOn  = "[xCredSSP]Client"
         }
-
         #>
 
         #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
