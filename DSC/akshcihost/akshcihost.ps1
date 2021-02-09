@@ -379,6 +379,7 @@ configuration AKSHCIHost
         {
             InterfaceAlias  = "vEthernet `($vSwitchNameHost`)"
             NetworkCategory = 'Private'
+            IPv4Connectivity = 'LocalNetwork'
             DependsOn       = "[NetAdapterBinding]DisableIPv6NAT"
         }
 
