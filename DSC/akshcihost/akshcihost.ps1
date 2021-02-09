@@ -40,12 +40,6 @@ configuration AKSHCIHost
             ConfigurationMode  = 'ApplyOnly'
         }
 
-        # STAGE 1 -> PRE-HYPER-V REBOOT
-        # STAGE 2 -> POST-HYPER-V REBOOT
-        # STAGE 3 -> POST CREDSSP REBOOT
-
-        #### STAGE 1a - CREATE STORAGE SPACES V: & VM FOLDER ####
-
         Script StoragePool {
             SetScript  = {
                 New-StoragePool -FriendlyName AksHciPool -StorageSubSystemFriendlyName '*storage*' -PhysicalDisks (Get-PhysicalDisk -CanPool $true)
@@ -71,6 +65,7 @@ configuration AKSHCIHost
             }
             DependsOn  = "[Script]StoragePool"
         }
+        
         Script FormatDisk {
             SetScript  = {
                 $vDisk = Get-VirtualDisk -FriendlyName AksHciDisk
@@ -96,8 +91,6 @@ configuration AKSHCIHost
             DependsOn       = "[Script]FormatDisk"
         }
 
-        #### STAGE 1b - SET WINDOWS DEFENDER EXCLUSION FOR VM STORAGE ####
-
         Script defenderExclusions {
             SetScript  = {
                 $exclusionPath = "$Using:targetDrive" + ":\"
@@ -113,8 +106,6 @@ configuration AKSHCIHost
             }
             DependsOn  = "[File]VMfolder"
         }
-
-        #### STAGE 1c - REGISTRY & SCHEDULED TASK TWEAKS ####
 
         Registry "Disable Internet Explorer ESC for Admin" {
             Key       = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"
@@ -170,6 +161,8 @@ configuration AKSHCIHost
             ValueType = "String"
         }
 
+        # CredSSP Registry Settings
+
         Registry "NewCredSSPKey" {
             Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
             Ensure    = 'Present'
@@ -192,15 +185,6 @@ configuration AKSHCIHost
             DependsOn = "[Registry]NewCredSSPKey2"
         }
 
-        ScheduledTask "Disable Server Manager at Startup"
-        {
-            TaskName = 'ServerManager'
-            Enable   = $false
-            TaskPath = '\Microsoft\Windows\Server Manager'
-        }
-
-        #### STAGE 1d - CUSTOM FIREWALL BASED ON ARM TEMPLATE ####
-
         if ($customRdpPort -ne "3389") {
 
             Registry "Set Custom RDP Port" {
@@ -209,7 +193,7 @@ configuration AKSHCIHost
                 ValueData = "$customRdpPort"
                 ValueType = 'Dword'
             }
-        
+
             Firewall AddFirewallRule
             {
                 Name        = 'CustomRdpRule'
@@ -224,7 +208,12 @@ configuration AKSHCIHost
             }
         }
 
-        #### STAGE 1e - ENABLE ROLES & FEATURES ####
+        ScheduledTask "Disable Server Manager at Startup"
+        {
+            TaskName = 'ServerManager'
+            Enable   = $false
+            TaskPath = '\Microsoft\Windows\Server Manager'
+        }
 
         WindowsFeature DNS { 
             Ensure = "Present" 
@@ -250,11 +239,6 @@ configuration AKSHCIHost
             Ensure    = "Present"
             Name      = "RSAT-DNS-Server"
             DependsOn = "[WindowsFeature]DNS"
-        }
-
-        WindowsFeature "RSAT-Clustering" {
-            Name   = "RSAT-Clustering"
-            Ensure = "Present"
         }
 
         WindowsFeature "Install DHCPServer" {
@@ -288,7 +272,10 @@ configuration AKSHCIHost
             DependsOn = "[WindowsFeature]Hyper-V" 
         }
 
-        #### STAGE 2a - HYPER-V Host & vSWITCH CONFIG ####
+        WindowsFeature "RSAT-Clustering" {
+            Name   = "RSAT-Clustering"
+            Ensure = "Present"
+        }
 
         xVMHost "hpvHost"
         {
@@ -304,6 +291,27 @@ configuration AKSHCIHost
             Name      = $vSwitchNameHost
             Type      = "Internal"
             DependsOn = "[WindowsFeature]Hyper-V"
+        }
+
+        NetConnectionProfile SetProfile
+        {
+            InterfaceAlias  = 'Ethernet'
+            NetworkCategory = 'Private'
+        }
+
+        NetAdapterBinding DisableIPv6Host
+        {
+            InterfaceAlias = 'Ethernet'
+            ComponentId    = 'ms_tcpip6'
+            State          = 'Disabled'
+        }
+
+        NetAdapterBinding DisableIPv6NAT
+        {
+            InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
+            ComponentId    = 'ms_tcpip6'
+            State          = 'Disabled'
+            DependsOn      = "[xVMSwitch]$vSwitchNameHost"
         }
 
         IPAddress "New IP for vEthernet $vSwitchNameHost"
@@ -322,51 +330,14 @@ configuration AKSHCIHost
             DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
         }
 
-        NetAdapterRdma "EnableRDMAonvEthernet"
+        NetAdapterRdma "Enable RDMA on vEthernet $vSwitchNameHost"
         {
             Name      = "vEthernet `($vSwitchNameHost`)"
             Enabled   = $true
             DependsOn = "[NetIPInterface]Enable IP forwarding on vEthernet $vSwitchNameHost"
         }
 
-        #### STAGE 2b - CONFIGURE InternaNAT NIC
-
-        script NAT {
-            GetScript  = {
-                $nat = "AKSHCINAT"
-                $result = if (Get-NetNat -Name $nat -ErrorAction SilentlyContinue) { $true } else { $false }
-                return @{ 'Result' = $result }
-            }
-        
-            SetScript  = {
-                $nat = "AKSHCINAT"
-                New-NetNat -Name $nat -InternalIPInterfaceAddressPrefix "192.168.0.0/16"          
-            }
-        
-            TestScript = {
-                # Create and invoke a scriptblock using the $GetScript automatic variable, which contains a string representation of the GetScript.
-                $state = [scriptblock]::Create($GetScript).Invoke()
-                return $state.Result
-            }
-            DependsOn  = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
-        }
-
-        NetAdapterBinding DisableIPv6NAT
-        {
-            InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
-            ComponentId    = 'ms_tcpip6'
-            State          = 'Disabled'
-            DependsOn      = "[Script]NAT"
-        }
-
-        NetConnectionProfile SetProfileNAT
-        {
-            InterfaceAlias  = "vEthernet `($vSwitchNameHost`)"
-            NetworkCategory = 'Private'
-            DependsOn       = "[NetAdapterBinding]DisableIPv6NAT"
-        }
-
-        #### STAGE 2c - CONFIGURE DHCP SERVER
+        # Configure DHCP
 
         xDhcpServerScope "AksHciDhcpScope" { 
             Ensure        = 'Present'
@@ -391,7 +362,34 @@ configuration AKSHCIHost
             DependsOn          = "[xDhcpServerScope]AksHciDhcpScope"
         }
 
-        #### STAGE 2d - CONFIGURE DNS SERVER
+        script NAT {
+            GetScript  = {
+                $nat = "AKSHCINAT"
+                $result = if (Get-NetNat -Name $nat -ErrorAction SilentlyContinue) { $true } else { $false }
+                return @{ 'Result' = $result }
+            }
+
+            SetScript  = {
+                $nat = "AKSHCINAT"
+                New-NetNat -Name $nat -InternalIPInterfaceAddressPrefix "192.168.0.0/16"          
+            }
+
+            TestScript = {
+                # Create and invoke a scriptblock using the $GetScript automatic variable, which contains a string representation of the GetScript.
+                $state = [scriptblock]::Create($GetScript).Invoke()
+                return $state.Result
+            }
+            DependsOn  = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
+        }
+
+        NetConnectionProfile SetProfileNAT
+        {
+            InterfaceAlias  = "vEthernet `($vSwitchNameHost`)"
+            NetworkCategory = 'Private'
+            DependsOn       = "[script]NAT"
+        }
+
+        # Configure DNS Server
 
         xDnsServerPrimaryZone SetPrimaryDNSZone {
             Name          = 'akshci.local'
@@ -416,8 +414,6 @@ configuration AKSHCIHost
             DependsOn       = "[xDnsServerPrimaryZone]SetReverseLookupZone"
         }
 
-        #### STAGE 2e - FINALIZE DHCP
-
         Script SetDHCPDNSSetting {
             SetScript  = { 
                 Set-DhcpServerv4DnsSetting -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True -UpdateDnsRRForOlderClients $True -DisableDnsPtrRRUpdate $false
@@ -429,7 +425,7 @@ configuration AKSHCIHost
             DependsOn  = "[xDnsServerSetting]SetListener"
         }
 
-        #### STAGE 2f - CONFIGURE DNS CLIENT ON NICS ####
+        # Set DNS Clients on Host
 
         DnsServerAddress "DnsServerAddress for HostNic"
         { 
@@ -461,13 +457,13 @@ configuration AKSHCIHost
             DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
         }
 
-        #### STAGE 2g - CONFIGURE CREDSSP & WinRM ####
+        # CredSSP & WinRM Fixes
 
         xCredSSP Server {
             Ensure         = "Present"
             Role           = "Server"
             DependsOn      = "[DnsConnectionSuffix]AddSpecificSuffixNATNic"
-            SuppressReboot = $True
+            SuppressReboot = $true
         }
         xCredSSP Client {
             Ensure            = "Present"
@@ -475,8 +471,6 @@ configuration AKSHCIHost
             DelegateComputers = "$env:COMPUTERNAME" + ".$domain"
             DependsOn         = "[xCredSSP]Server"
         }
-
-        #### STAGE 3a - CONFIGURE WinRM ####
 
         Script ConfigureWinRM {
             SetScript  = {
@@ -491,24 +485,7 @@ configuration AKSHCIHost
             DependsOn  = "[xCredSSP]Client"
         }
 
-        #### STAGE 3b - Configure Host Nic Profile
-
-        NetAdapterBinding DisableIPv6Host
-        {
-            InterfaceAlias = 'Ethernet'
-            ComponentId    = 'ms_tcpip6'
-            State          = 'Disabled'
-            DependsOn      = "[Script]ConfigureWinRM"
-        }
-
-        NetConnectionProfile SetProfile
-        {
-            InterfaceAlias  = 'Ethernet'
-            NetworkCategory = 'Private'
-            DependsOn       = "[Script]ConfigureWinRM"
-        }
-
-        #### STAGE 3c - INSTALL CHOCO & DEPLOY EDGE
+        # Install Choco
 
         Script installChoco {
             SetScript  = { 
@@ -519,7 +496,11 @@ configuration AKSHCIHost
             }
             TestScript = { $false }
         }
-    
+        
+        #cChocoInstaller InstallChoco {
+        #    InstallDir = "c:\choco"
+        #}
+
         cChocoFeature allowGlobalConfirmation {
             FeatureName = "allowGlobalConfirmation"
             Ensure      = 'Present'
@@ -531,6 +512,15 @@ configuration AKSHCIHost
             Ensure      = 'Present'
             DependsOn   = '[Script]installChoco'
         }
+
+        <#
+        cChocoPackageInstaller "Install Chromium Edge" {
+            Name        = 'microsoft-edge'
+            Ensure      = 'Present'
+            AutoUpgrade = $true
+            DependsOn   = '[Script]installChoco'
+        }
+        #>
 
         Script installEdge {
             SetScript  = {
