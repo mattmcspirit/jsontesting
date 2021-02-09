@@ -109,7 +109,6 @@ configuration AKSHCIHost
 
         Registry "Disable Internet Explorer ESC for Admin" {
             Key       = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"
-            Ensure    = 'Present'
             ValueName = "IsInstalled"
             ValueData = "0"
             ValueType = "Dword"
@@ -117,7 +116,6 @@ configuration AKSHCIHost
 
         Registry "Disable Internet Explorer ESC for User" {
             Key       = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}"
-            Ensure    = 'Present'
             ValueName = "IsInstalled"
             ValueData = "0"
             ValueType = "Dword"
@@ -125,7 +123,6 @@ configuration AKSHCIHost
 
         Registry "Add Wac to Intranet zone for SSO" {
             Key       = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\EscDomains\wac'
-            Ensure    = 'Present'
             ValueName = "https"
             ValueData = "1"
             ValueType = 'Dword'
@@ -133,7 +130,6 @@ configuration AKSHCIHost
         
         Registry "Disable Server Manager WAC Prompt" {
             Key       = "HKLM:\SOFTWARE\Microsoft\ServerManager"
-            Ensure    = 'Present'
             ValueName = "DoNotPopWACConsoleAtSMLaunch"
             ValueData = "1"
             ValueType = "Dword"
@@ -147,7 +143,6 @@ configuration AKSHCIHost
 
         Registry "SetWorkgroupDomain" {
             Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
-            Ensure    = 'Present'
             ValueName = "Domain"
             ValueData = "akshci.local"
             ValueType = "String"
@@ -155,7 +150,6 @@ configuration AKSHCIHost
 
         Registry "SetWorkgroupNVDomain" {
             Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
-            Ensure    = 'Present'
             ValueName = "NV Domain"
             ValueData = "akshci.local"
             ValueType = "String"
@@ -382,12 +376,14 @@ configuration AKSHCIHost
             DependsOn  = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
         }
 
+        <#
         NetConnectionProfile SetProfileNAT
         {
             InterfaceAlias  = "vEthernet `($vSwitchNameHost`)"
             NetworkCategory = 'Private'
             DependsOn       = "[script]NAT"
         }
+        #>
 
         # Configure DNS Server
 
