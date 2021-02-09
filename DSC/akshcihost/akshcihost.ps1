@@ -338,11 +338,15 @@ configuration AKSHCIHost
             State          = 'Disabled'
         }
 
+        <#
+
         NetConnectionProfile SetProfile
         {
             InterfaceAlias  = 'Ethernet'
             NetworkCategory = 'Private'
         }
+
+        #>
 
         #### STAGE 2c - CONFIGURE InternaNAT NIC
 
@@ -374,12 +378,43 @@ configuration AKSHCIHost
             DependsOn      = "[Script]NAT"
         }
 
+        <#
+
         NetConnectionProfile SetProfileNAT
         {
             InterfaceAlias  = "vEthernet `($vSwitchNameHost`)"
             NetworkCategory = 'Private'
             DependsOn       = "[NetAdapterBinding]DisableIPv6NAT"
         }
+
+        #>
+
+        #### Force NetConnectionProfile ####
+        # Using this approach to overcome timing issues after rebooting and network "identifying"
+
+        Script SetNetConnectionProfile {
+            SetScript  = {
+                $netConnectionProfileSuccess = $false
+                $Retries = 0
+                while (($netConnectionProfileSuccess -eq $false) -and ($Retries++ -lt 10)) {
+                    try {
+                        Write-Host "Attempting to set all NICs with Private Profile - Attempt #$Retries"
+                        Get-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private
+                        $netConnectionProfileSuccess = $true
+                    }
+                    catch {
+                        Write-Host "Setting Network Profile wasn't successful - trying again in 10 seconds."
+                        Write-Host "$_.Exception.Message"
+                        Start-Sleep -Seconds 10
+                    }
+                }
+            }
+            GetScript  = { @{} 
+            }
+            TestScript = { $false }
+            DependsOn  = "[NetAdapterBinding]DisableIPv6NAT"
+        }
+
 
         #### STAGE 2d - CONFIGURE DHCP SERVER
 
@@ -503,7 +538,7 @@ configuration AKSHCIHost
             GetScript  = {
                 @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$domain") { 'Present' } Else { 'Absent' } }
             }
-            DependsOn  = "[xCredSSP]Client"
+            DependsOn  = @("[xCredSSP]Client","[Script]SetNetConnectionProfile")
         }
 
         #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
