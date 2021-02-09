@@ -9,6 +9,7 @@
         "xDhcpServer",
         "xDNSServer",
         "cChoco",
-        "DSCR_Shortcut"
+        "DSCR_Shortcut",
+        "xCredSSP"
     ]
 }
