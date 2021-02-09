@@ -329,13 +329,7 @@ configuration AKSHCIHost
             DependsOn = "[NetIPInterface]Enable IP forwarding on vEthernet $vSwitchNameHost"
         }
 
-        #### STAGE 2b - UNIVERSAL NETWORK CONFIG ####
-
-        NetConnectionProfile SetProfile
-        {
-            InterfaceAlias  = 'Ethernet'
-            NetworkCategory = 'Private'
-        }
+        #### STAGE 2b - PRIMARY NIC CONFIG ####
 
         NetAdapterBinding DisableIPv6Host
         {
@@ -344,11 +338,32 @@ configuration AKSHCIHost
             State          = 'Disabled'
         }
 
-        NetConnectionProfile SetProfileNAT
+        NetConnectionProfile SetProfile
         {
-            InterfaceAlias  = "vEthernet `($vSwitchNameHost`)"
+            InterfaceAlias  = 'Ethernet'
             NetworkCategory = 'Private'
-            DependsOn      = "[NetAdapterRdma]EnableRDMAonvEthernet"
+        }
+
+        #### STAGE 2c - CONFIGURE InternaNAT NIC
+
+        script NAT {
+            GetScript  = {
+                $nat = "AKSHCINAT"
+                $result = if (Get-NetNat -Name $nat -ErrorAction SilentlyContinue) { $true } else { $false }
+                return @{ 'Result' = $result }
+            }
+        
+            SetScript  = {
+                $nat = "AKSHCINAT"
+                New-NetNat -Name $nat -InternalIPInterfaceAddressPrefix "192.168.0.0/16"          
+            }
+        
+            TestScript = {
+                # Create and invoke a scriptblock using the $GetScript automatic variable, which contains a string representation of the GetScript.
+                $state = [scriptblock]::Create($GetScript).Invoke()
+                return $state.Result
+            }
+            DependsOn  = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
         }
 
         NetAdapterBinding DisableIPv6NAT
@@ -356,30 +371,15 @@ configuration AKSHCIHost
             InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
             ComponentId    = 'ms_tcpip6'
             State          = 'Disabled'
-            DependsOn      = "[xVMSwitch]$vSwitchNameHost"
+            DependsOn      = "[Script]NAT"
         }
 
-                #### STAGE 2c - CONFIGURE NAT
-
-                script NAT {
-                    GetScript  = {
-                        $nat = "AKSHCINAT"
-                        $result = if (Get-NetNat -Name $nat -ErrorAction SilentlyContinue) { $true } else { $false }
-                        return @{ 'Result' = $result }
-                    }
-        
-                    SetScript  = {
-                        $nat = "AKSHCINAT"
-                        New-NetNat -Name $nat -InternalIPInterfaceAddressPrefix "192.168.0.0/16"          
-                    }
-        
-                    TestScript = {
-                        # Create and invoke a scriptblock using the $GetScript automatic variable, which contains a string representation of the GetScript.
-                        $state = [scriptblock]::Create($GetScript).Invoke()
-                        return $state.Result
-                    }
-                    DependsOn  = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
-                }
+        NetConnectionProfile SetProfileNAT
+        {
+            InterfaceAlias  = "vEthernet `($vSwitchNameHost`)"
+            NetworkCategory = 'Private'
+            DependsOn       = "[NetAdapterBinding]DisableIPv6NAT"
+        }
 
         #### STAGE 2d - CONFIGURE DHCP SERVER
 
