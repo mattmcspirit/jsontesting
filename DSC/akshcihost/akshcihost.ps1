@@ -146,7 +146,7 @@ configuration AKSHCIHost
         }
 
         Registry "SetWorkgroupDomain" {
-            Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\"
+            Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
             Ensure    = 'Present'
             ValueName = "Domain"
             ValueData = "akshci.local"
@@ -154,7 +154,7 @@ configuration AKSHCIHost
         }
 
         Registry "SetWorkgroupNVDomain" {
-            Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\"
+            Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
             Ensure    = 'Present'
             ValueName = "NV Domain"
             ValueData = "akshci.local"
@@ -170,7 +170,7 @@ configuration AKSHCIHost
         }
 
         Registry "NewCredSSPKey2" {
-            Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\'
+            Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation'
             ValueName = 'AllowFreshCredentialsWhenNTLMOnly'
             ValueData = '1'
             ValueType = "Dword"
@@ -463,6 +463,7 @@ configuration AKSHCIHost
             Ensure    = "Present"
             Role      = "Server"
             DependsOn = "[DnsConnectionSuffix]AddSpecificSuffixNATNic"
+            SuppressReboot = $True
         }
         xCredSSP Client {
             Ensure            = "Present"
