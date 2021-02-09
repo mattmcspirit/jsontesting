@@ -154,6 +154,14 @@ configuration AKSHCIHost
             ValueName = ''
         }
 
+        Registry "Set Network Private Profile Default" {
+            Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\CurrentVersion\NetworkList\Signatures\010103000F0000F0010000000F0000F0C967A3643C3AD745950DA7859209176EF5B87C875FA20DF21951640E807D7C24'
+            Ensure    = 'Present'
+            ValueName = "Category"
+            ValueData = "1"
+            ValueType = "Dword"
+        }
+
         Registry "SetWorkgroupDomain" {
             Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
             Ensure    = 'Present'
@@ -375,13 +383,14 @@ configuration AKSHCIHost
             DependsOn      = "[Script]NAT"
         }
 
+        <#
         NetConnectionProfile SetProfileNAT
         {
             InterfaceAlias  = "vEthernet `($vSwitchNameHost`)"
             NetworkCategory = 'Private'
             IPv4Connectivity = 'LocalNetwork'
             DependsOn       = "[NetAdapterBinding]DisableIPv6NAT"
-        }
+        }#>
 
         #### Force NetConnectionProfile ####
         <# Using this approach to overcome timing issues after rebooting and network "identifying"
