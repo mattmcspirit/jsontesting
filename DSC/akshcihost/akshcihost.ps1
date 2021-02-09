@@ -288,7 +288,7 @@ configuration AKSHCIHost
             DependsOn = "[WindowsFeature]Hyper-V" 
         }
 
-        #### STAGE 2a - HYPER-V vSWITCH CONFIG ####
+        #### STAGE 2a - HYPER-V Host & vSWITCH CONFIG ####
 
         xVMHost "hpvHost"
         {
@@ -329,22 +329,7 @@ configuration AKSHCIHost
             DependsOn = "[NetIPInterface]Enable IP forwarding on vEthernet $vSwitchNameHost"
         }
 
-        #### STAGE 2b - PRIMARY NIC CONFIG ####
-
-        NetAdapterBinding DisableIPv6Host
-        {
-            InterfaceAlias = 'Ethernet'
-            ComponentId    = 'ms_tcpip6'
-            State          = 'Disabled'
-        }
-
-        NetConnectionProfile SetProfile
-        {
-            InterfaceAlias  = 'Ethernet'
-            NetworkCategory = 'Private'
-        }
-
-        #### STAGE 2c - CONFIGURE InternaNAT NIC
+        #### STAGE 2b - CONFIGURE InternaNAT NIC
 
         script NAT {
             GetScript  = {
@@ -381,7 +366,7 @@ configuration AKSHCIHost
             DependsOn       = "[NetAdapterBinding]DisableIPv6NAT"
         }
 
-        #### STAGE 2d - CONFIGURE DHCP SERVER
+        #### STAGE 2c - CONFIGURE DHCP SERVER
 
         xDhcpServerScope "AksHciDhcpScope" { 
             Ensure        = 'Present'
@@ -406,7 +391,7 @@ configuration AKSHCIHost
             DependsOn          = "[xDhcpServerScope]AksHciDhcpScope"
         }
 
-        #### STAGE 2e - CONFIGURE DNS SERVER
+        #### STAGE 2d - CONFIGURE DNS SERVER
 
         xDnsServerPrimaryZone SetPrimaryDNSZone {
             Name          = 'akshci.local'
@@ -431,7 +416,7 @@ configuration AKSHCIHost
             DependsOn       = "[xDnsServerPrimaryZone]SetReverseLookupZone"
         }
 
-        #### STAGE 2f - FINALIZE DHCP
+        #### STAGE 2e - FINALIZE DHCP
 
         Script SetDHCPDNSSetting {
             SetScript  = { 
@@ -444,7 +429,7 @@ configuration AKSHCIHost
             DependsOn  = "[xDnsServerSetting]SetListener"
         }
 
-        #### STAGE 2g - CONFIGURE DNS CLIENT ON NICS
+        #### STAGE 2f - CONFIGURE DNS CLIENT ON NICS ####
 
         DnsServerAddress "DnsServerAddress for HostNic"
         { 
@@ -476,7 +461,7 @@ configuration AKSHCIHost
             DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
         }
 
-        #### STAGE 2h - CONFIGURE CREDSSP & WinRM
+        #### STAGE 2g - CONFIGURE CREDSSP & WinRM ####
 
         xCredSSP Server {
             Ensure         = "Present"
@@ -491,7 +476,7 @@ configuration AKSHCIHost
             DependsOn         = "[xCredSSP]Server"
         }
 
-        #### STAGE 3a - CONFIGURE WinRM
+        #### STAGE 3a - CONFIGURE WinRM ####
 
         Script ConfigureWinRM {
             SetScript  = {
@@ -506,7 +491,24 @@ configuration AKSHCIHost
             DependsOn  = "[xCredSSP]Client"
         }
 
-        #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
+        #### STAGE 3b - Configure Host Nic Profile
+
+        NetAdapterBinding DisableIPv6Host
+        {
+            InterfaceAlias = 'Ethernet'
+            ComponentId    = 'ms_tcpip6'
+            State          = 'Disabled'
+            DependsOn      = "[Script]ConfigureWinRM"
+        }
+
+        NetConnectionProfile SetProfile
+        {
+            InterfaceAlias  = 'Ethernet'
+            NetworkCategory = 'Private'
+            DependsOn       = "[Script]ConfigureWinRM"
+        }
+
+        #### STAGE 3c - INSTALL CHOCO & DEPLOY EDGE
 
         Script installChoco {
             SetScript  = { 
