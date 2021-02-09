@@ -331,22 +331,19 @@ configuration AKSHCIHost
 
         #### STAGE 2b - PRIMARY NIC CONFIG ####
 
-        NetAdapterBinding DisableIPv6Host
-        {
-            InterfaceAlias = 'Ethernet'
-            ComponentId    = 'ms_tcpip6'
-            State          = 'Disabled'
-        }
-
-        <#
-
         NetConnectionProfile SetProfile
         {
             InterfaceAlias  = 'Ethernet'
             NetworkCategory = 'Private'
         }
 
-        #>
+        NetAdapterBinding DisableIPv6Host
+        {
+            InterfaceAlias = 'Ethernet'
+            ComponentId    = 'ms_tcpip6'
+            State          = 'Disabled'
+            DependsOn      = "[NetConnectionProfile]SetProfile"
+        }
 
         #### STAGE 2c - CONFIGURE InternaNAT NIC
 
@@ -390,7 +387,7 @@ configuration AKSHCIHost
         #>
 
         #### Force NetConnectionProfile ####
-        # Using this approach to overcome timing issues after rebooting and network "identifying"
+        <# Using this approach to overcome timing issues after rebooting and network "identifying"
 
         Script SetNetConnectionProfile {
             SetScript  = {
@@ -399,7 +396,7 @@ configuration AKSHCIHost
                 while (($netConnectionProfileSuccess -eq $false) -and ($Retries++ -lt 10)) {
                     try {
                         Write-Host "Attempting to set all NICs with Private Profile - Attempt #$Retries"
-                        Get-NetConnectionProfile | Set-NetConnectionProfile -NetworkCategory Private
+                        Set-NetConnectionProfile -InterfaceAlias $Using: -NetworkCategory Private -ErrorAction SilentlyContinue
                         $netConnectionProfileSuccess = $true
                     }
                     catch {
@@ -415,6 +412,7 @@ configuration AKSHCIHost
             DependsOn  = "[NetAdapterBinding]DisableIPv6NAT"
         }
 
+        #>
 
         #### STAGE 2d - CONFIGURE DHCP SERVER
 
@@ -526,7 +524,7 @@ configuration AKSHCIHost
             DependsOn         = "[xCredSSP]Server"
         }
 
-        #### STAGE 3a - CONFIGURE WinRM
+        <#### STAGE 3a - CONFIGURE WinRM
 
         Script ConfigureWinRM {
             SetScript  = {
@@ -541,8 +539,11 @@ configuration AKSHCIHost
             DependsOn  = @("[xCredSSP]Client","[Script]SetNetConnectionProfile")
         }
 
+        #>
+
         #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
 
+        <#
         Script installChoco {
             SetScript  = { 
                 Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
@@ -551,6 +552,11 @@ configuration AKSHCIHost
             GetScript  = { @{} 
             }
             TestScript = { $false }
+        }
+        #>
+
+        cChocoInstaller InstallChoco {
+            InstallDir = "c:\choco"
         }
     
         cChocoFeature allowGlobalConfirmation {
@@ -565,6 +571,7 @@ configuration AKSHCIHost
             DependsOn   = '[Script]installChoco'
         }
 
+        <#
         Script installEdge {
             SetScript  = {
                 choco install microsoft-edge
@@ -573,6 +580,14 @@ configuration AKSHCIHost
             }
             TestScript = { $false }
             DependsOn  = '[Script]installChoco'
+        }
+        #>
+
+        cChocoPackageInstaller "Install Chromium Edge" {
+            Name        = 'microsoft-edge'
+            Ensure      = 'Present'
+            AutoUpgrade = $true
+            DependsOn   = '[cChocoInstaller]installChoco'
         }
     }
 }
