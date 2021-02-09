@@ -383,15 +383,6 @@ configuration AKSHCIHost
             DependsOn      = "[Script]NAT"
         }
 
-        <#
-        NetConnectionProfile SetProfileNAT
-        {
-            InterfaceAlias  = "vEthernet `($vSwitchNameHost`)"
-            NetworkCategory = 'Private'
-            IPv4Connectivity = 'LocalNetwork'
-            DependsOn       = "[NetAdapterBinding]DisableIPv6NAT"
-        }#>
-
         #### STAGE 2d - CONFIGURE DHCP SERVER
 
         xDhcpServerScope "AksHciDhcpScope" { 
