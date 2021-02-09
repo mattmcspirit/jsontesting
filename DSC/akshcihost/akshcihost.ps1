@@ -493,6 +493,8 @@ configuration AKSHCIHost
             DependsOn         = "[xCredSSP]Server"
         }
 
+        <#
+
         #### STAGE 3a - CONFIGURE WinRM
 
         Script ConfigureWinRM {
@@ -507,6 +509,8 @@ configuration AKSHCIHost
             }
             DependsOn  = "[xCredSSP]Client"
         }
+
+        #>
 
         #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
 
