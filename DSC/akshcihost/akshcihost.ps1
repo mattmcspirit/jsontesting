@@ -375,16 +375,12 @@ configuration AKSHCIHost
             DependsOn      = "[Script]NAT"
         }
 
-        <#
-
         NetConnectionProfile SetProfileNAT
         {
             InterfaceAlias  = "vEthernet `($vSwitchNameHost`)"
             NetworkCategory = 'Private'
             DependsOn       = "[NetAdapterBinding]DisableIPv6NAT"
         }
-
-        #>
 
         #### Force NetConnectionProfile ####
         <# Using this approach to overcome timing issues after rebooting and network "identifying"
