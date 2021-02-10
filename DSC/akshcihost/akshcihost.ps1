@@ -3,34 +3,44 @@ configuration AKSHCIHost
     param 
     ( 
         [Parameter(Mandatory)]
+        [string]$domainName,
+        [Parameter(Mandatory)]
+        [System.Management.Automation.PSCredential]$AdminCreds,
+        [Parameter(Mandatory)]
         [string]$enableDHCP,
+        [Parameter(Mandatory)]
         [string]$customRdpPort,
-        [string]$domain = "akshci.local",
         [Int]$RetryCount = 20,
         [Int]$RetryIntervalSec = 30,
         [string]$vSwitchNameHost = "InternalNAT",
+        [String]$AdDrive = "F",
         [String]$targetDrive = "V",
         [String]$targetVMPath = "$targetDrive" + ":\VMs",
         [String]$baseVHDFolderPath = "$targetVMPath\base"
     ) 
     
-    Import-DscResource -ModuleName 'StorageDSC'
-    Import-DscResource -ModuleName 'NetworkingDSC'
     Import-DscResource -ModuleName 'PSDesiredStateConfiguration'
+    Import-DscResource -ModuleName 'xPSDesiredStateConfiguration'
     Import-DscResource -ModuleName 'ComputerManagementDsc'
     Import-DscResource -ModuleName 'xHyper-v'
-    Import-DscResource -ModuleName 'cHyper-v'
-    Import-DscResource -ModuleName 'xPSDesiredStateConfiguration'
+    Import-DscResource -ModuleName 'StorageDSC'
+    Import-DscResource -ModuleName 'NetworkingDSC'
     Import-DscResource -ModuleName 'xDHCpServer'
     Import-DscResource -ModuleName 'xDNSServer'
     Import-DscResource -ModuleName 'cChoco'
     Import-DscResource -ModuleName 'DSCR_Shortcut'
-    Import-DscResource -ModuleName 'xCredSSP'
+    Import-DscResource -ModuleName 'cCredSSP'
 
     if ($enableDHCP -eq "Enabled") {
         $dhcpStatus = "Active"
     }
     else { $dhcpStatus = "Inactive" }
+
+    [System.Management.Automation.PSCredential]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${domainName}\$($AdminCreds.UserName)", $AdminCreds.Password)
+
+    $ipConfig = (Get-NetAdapter -Physical | Get-NetIPConfiguration | Where-Object IPv4DefaultGateway)
+    $netAdapters = Get-NetAdapter -Name ($ipConfig.InterfaceAlias) | Select-Object -First 1
+    $InterfaceAlias=$($netAdapters.Name)
 
     Node localhost
     {
@@ -260,6 +270,14 @@ configuration AKSHCIHost
             DependsOn = "[WindowsFeature]DNS"
         }
 
+        DnsServerAddress "DnsServerAddress for $InterfaceAlias"
+        { 
+            Address        = '127.0.0.1'
+            InterfaceAlias = $InterfaceAlias
+            AddressFamily  = 'IPv4'
+	        DependsOn = "[WindowsFeature]DNS"
+        }
+
         WindowsFeature "RSAT-Clustering" {
             Name   = "RSAT-Clustering"
             Ensure = "Present"
@@ -335,6 +353,14 @@ configuration AKSHCIHost
             Name      = "vEthernet `($vSwitchNameHost`)"
             Enabled   = $true
             DependsOn = "[NetIPInterface]Enable IP forwarding on vEthernet $vSwitchNameHost"
+        }
+
+        DnsServerAddress "DnsServerAddress for vEthernet $vSwitchNameMgmt" 
+        { 
+            Address        = '127.0.0.1' 
+            InterfaceAlias = "vEthernet `($vSwitchNameMgmt`)"
+            AddressFamily  = 'IPv4'
+	        DependsOn = "[IPAddress]New IP for vEthernet $vSwitchNameMgmt"
         }
 
         #### STAGE 2b - PRIMARY NIC CONFIG ####
@@ -426,12 +452,14 @@ configuration AKSHCIHost
             DynamicUpdate = 'NonSecureAndSecure'
         }
 
+        <#
         xDnsServerSetting SetListener {
             Name            = 'AksHciListener'
             ListenAddresses = '192.168.0.1'
             Forwarders      = @('1.1.1.1', '1.0.0.1')
             DependsOn       = "[xDnsServerPrimaryZone]SetReverseLookupZone"
         }
+        #>
 
         #### STAGE 2f - FINALIZE DHCP
 
@@ -448,6 +476,7 @@ configuration AKSHCIHost
 
         #### STAGE 2g - CONFIGURE DNS CLIENT ON NICS
 
+        <#
         DnsServerAddress "DnsServerAddress for HostNic"
         { 
             Address        = '192.168.0.1'
@@ -463,6 +492,7 @@ configuration AKSHCIHost
             AddressFamily  = 'IPv4'
             DependsOn      = @("[WindowsFeature]DNS", "[IPAddress]New IP for vEthernet $vSwitchNameHost", "[xDnsServerSetting]SetListener")
         }
+        #>
 
         DnsConnectionSuffix AddSpecificSuffixHostNic
         {
