@@ -95,8 +95,9 @@
         },
         "dataDiskSize": {
             "type": "string",
-            "defaultValue": "64",
+            "defaultValue": "32",
             "allowedValues": [
+                "32",
                 "64",
                 "128",
                 "256",
