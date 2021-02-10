@@ -79,7 +79,7 @@
             "type": "string",
             "defaultValue": "akshci.local",
             "metadata": {
-                "description": "The FQDN of the Active Directory Domain to be created"
+                "description": "The FQDN that will be used in the environment"
             }
         },
         "dataDiskType": {
