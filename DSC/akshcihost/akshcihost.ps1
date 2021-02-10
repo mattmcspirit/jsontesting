@@ -93,5 +93,36 @@ configuration AKSHCIHost
             }
             DependsOn  = "[Script]VirtualDisk"
         }
+
+        WaitForDisk Disk1 {
+            DiskId           = "$((Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId)"
+            DiskIdType       = 'UniqueId'
+            RetryIntervalSec = $RetryIntervalSec
+            RetryCount       = $RetryCount
+            DependsOn        = '[Script]InitializeDisk'
+        }
+
+        Disk ADDSvolume {
+            DiskId      = "$((Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId)"
+            DiskIdType  = 'UniqueId'
+            DriveLetter = $AdDrive
+            Size        = 20GB
+            FSFormat    = 'NTFS'
+            DependsOn   = '[WaitForDisk]Disk1'
+        }
+
+        Disk AksHCIVolume {
+            DiskId      = "$((Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId)"
+            DiskIdType  = 'UniqueId'
+            DriveLetter = $targetDrive
+            FSLabel     = 'AksHciData'
+            DependsOn   = '[Disk]ADDSvolume'
+        }
+
+        File "VMfolder" {
+            Type            = 'Directory'
+            DestinationPath = $targetVMPath
+            DependsOn       = "[Disk]AksHciVolume"
+        }
     }
 }
