@@ -86,7 +86,7 @@ configuration AKSHCIHost
                 Get-VirtualDisk -FriendlyName AksHciDisk | Get-Disk | Initialize-Disk
             }
             TestScript = { 
-                (Get-Disk -FriendlyName AksHciDisk).PartitionStyle -eq 'GPT'
+                (Get-Disk -FriendlyName AksHciDisk -ErrorAction SilentlyContinue).PartitionStyle -eq 'GPT'
             }
             GetScript  = {
                 @{Ensure = if ((Get-Disk -FriendlyName AksHciDisk).PartitionStyle -eq 'GPT') { 'Present' } Else { 'Absent' } }
@@ -374,12 +374,12 @@ configuration AKSHCIHost
             DependsOn = "[NetIPInterface]Enable IP forwarding on vEthernet $vSwitchNameHost"
         }
 
-        DnsServerAddress "DnsServerAddress for vEthernet $vSwitchNameMgmt" 
+        DnsServerAddress "DnsServerAddress for vEthernet $vSwitchNameHost" 
         { 
             Address        = '127.0.0.1' 
-            InterfaceAlias = "vEthernet `($vSwitchNameMgmt`)"
+            InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
             AddressFamily  = 'IPv4'
-            DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameMgmt"
+            DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
         }
 
         #### STAGE 2b - PRIMARY NIC CONFIG ####
@@ -490,7 +490,7 @@ configuration AKSHCIHost
             GetScript  = { @{} 
             }
             TestScript = { $false }
-            DependsOn  = "[xDnsServerSetting]SetListener"
+            DependsOn  = "[xDnsServerPrimaryZone]SetReverseLookupZone"
         }
 
         #### STAGE 2g - CONFIGURE DNS CLIENT ON NICS
