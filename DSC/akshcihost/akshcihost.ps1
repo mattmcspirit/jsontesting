@@ -205,7 +205,7 @@ configuration AKSHCIHost
         Registry "NewCredSSPKey3" {
             Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
             ValueName = '1'
-            ValueData = "*.$domain"
+            ValueData = "*.$domainName"
             ValueType = "String"
             DependsOn = "[Registry]NewCredSSPKey2"
         }
@@ -519,7 +519,7 @@ configuration AKSHCIHost
         xCredSSP Client {
             Ensure         = "Present"
             Role           = "Client"
-            DelegateComputers = "$env:COMPUTERNAME" + ".$domain"
+            DelegateComputers = "$env:COMPUTERNAME" + ".$domainName"
             DependsOn      = "[xCredSSP]Server"
             SuppressReboot = $true
         }
@@ -528,13 +528,13 @@ configuration AKSHCIHost
 
         Script ConfigureWinRM {
             SetScript  = {
-                Set-Item WSMan:\localhost\Client\TrustedHosts "*.$domain" -Force
+                Set-Item WSMan:\localhost\Client\TrustedHosts "*.$domainName" -Force
             }
             TestScript = {
-                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$domain"
+                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$domainName"
             }
             GetScript  = {
-                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$domain") { 'Present' } Else { 'Absent' } }
+                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$domainName") { 'Present' } Else { 'Absent' } }
             }
             DependsOn  = "[xCredSSP]Client"
         }
