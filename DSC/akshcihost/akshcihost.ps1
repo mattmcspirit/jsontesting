@@ -181,7 +181,7 @@ configuration AKSHCIHost
             Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
             Ensure    = 'Present'
             ValueName = "Domain"
-            ValueData = ".$DomainName"
+            ValueData = "$DomainName"
             ValueType = "String"
         }
 
@@ -189,7 +189,7 @@ configuration AKSHCIHost
             Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
             Ensure    = 'Present'
             ValueName = "NV Domain"
-            ValueData = ".$DomainName"
+            ValueData = "$DomainName"
             ValueType = "String"
         }
 
