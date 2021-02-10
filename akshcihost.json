@@ -510,7 +510,7 @@
                             "configurationArguments": {
                                 "AdminCreds": {
                                     "UserName": "[parameters('adminUsername')]",
-                                    "AdminPassword": "[parameters('adminPassword')]"
+                                    "Password": "[parameters('adminPassword')]"
                                 }
                             }
                         }
