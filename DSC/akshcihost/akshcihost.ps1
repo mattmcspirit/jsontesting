@@ -3,9 +3,9 @@ configuration AKSHCIHost
     param 
     ( 
         [Parameter(Mandatory)]
-        [string]$domainName,
+        [string]$DomainName,
         [Parameter(Mandatory)]
-        [System.Management.Automation.PSCredential]$AdminCreds,
+        [System.Management.Automation.PSCredential]$Admincreds,
         [Parameter(Mandatory)]
         [string]$enableDHCP,
         [Parameter(Mandatory)]
@@ -36,7 +36,7 @@ configuration AKSHCIHost
     }
     else { $dhcpStatus = "Inactive" }
 
-    #[System.Management.Automation.PSCredential]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${domainName}\$($AdminCreds.UserName)", $AdminCreds.Password)
+    #[System.Management.Automation.PSCredential]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${DomainName}\$($Admincreds.UserName)", $Admincreds.Password)
 
     $ipConfig = (Get-NetAdapter -Physical | Get-NetIPConfiguration | Where-Object IPv4DefaultGateway)
     $netAdapters = Get-NetAdapter -Name ($ipConfig.InterfaceAlias) | Select-Object -First 1

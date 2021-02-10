@@ -501,14 +501,14 @@
                                 "function": "AKSHCIHost"
                             },
                             "configurationArguments": {
-                                "domainName": "[parameters('domainName')]",
+                                "DomainName": "[parameters('domainName')]",
                                 "enableDHCP": "[parameters('enableDHCP')]",
                                 "customRdpPort": "[parameters('customRdpPort')]"
                             }
                         },
                         "protectedSettings": {
                             "configurationArguments": {
-                                "AdminCreds": {
+                                "adminCreds": {
                                     "UserName": "[parameters('adminUsername')]",
                                     "Password": "[parameters('adminPassword')]"
                                 }
