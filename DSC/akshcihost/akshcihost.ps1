@@ -29,7 +29,7 @@ configuration AKSHCIHost
     Import-DscResource -ModuleName 'xDNSServer'
     Import-DscResource -ModuleName 'cChoco'
     Import-DscResource -ModuleName 'DSCR_Shortcut'
-    Import-DscResource -ModuleName 'cCredSSP'
+    Import-DscResource -ModuleName 'xCredSSP'
 
     if ($enableDHCP -eq "Enabled") {
         $dhcpStatus = "Active"
