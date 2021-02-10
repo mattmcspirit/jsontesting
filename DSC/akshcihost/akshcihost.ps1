@@ -13,9 +13,9 @@ configuration AKSHCIHost
         [Int]$RetryCount = 20,
         [Int]$RetryIntervalSec = 30,
         [string]$vSwitchNameHost = "InternalNAT",
-        [String]$AdDrive = "F",
         [String]$targetDrive = "V",
         [String]$targetVMPath = "$targetDrive" + ":\VMs",
+        [String]$targetADPath = "$targetDrive" + ":\ADDS",
         [String]$baseVHDFolderPath = "$targetVMPath\base"
     ) 
     
@@ -81,48 +81,35 @@ configuration AKSHCIHost
             }
             DependsOn  = "[Script]StoragePool"
         }
-        Script InitializeDisk {
+        Script FormatDisk {
             SetScript  = {
-                Get-VirtualDisk -FriendlyName AksHciDisk | Get-Disk | Initialize-Disk
+                $vDisk = Get-VirtualDisk -FriendlyName AksHciDisk
+                if ($vDisk | Get-Disk | Where-Object PartitionStyle -eq 'raw') {
+                    $vDisk | Get-Disk | Initialize-Disk -Passthru | New-Partition -DriveLetter $Using:targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
+                }
+                elseif ($vDisk | Get-Disk | Where-Object PartitionStyle -eq 'GPT') {
+                    $vDisk | Get-Disk | New-Partition -DriveLetter $Using:targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
+                }
             }
             TestScript = { 
-                (Get-Disk -FriendlyName AksHciDisk -ErrorAction SilentlyContinue).PartitionStyle -eq 'GPT'
+                (Get-Volume -ErrorAction SilentlyContinue -FileSystemLabel AksHciData).FileSystem -eq 'NTFS'
             }
             GetScript  = {
-                @{Ensure = if ((Get-Disk -FriendlyName AksHciDisk).PartitionStyle -eq 'GPT') { 'Present' } Else { 'Absent' } }
+                @{Ensure = if ((Get-Volume -FileSystemLabel AksHciData).FileSystem -eq 'NTFS') { 'Present' } Else { 'Absent' } }
             }
             DependsOn  = "[Script]VirtualDisk"
-        }
-
-        WaitForDisk Disk1 {
-            DiskId           = $(Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
-            DiskIdType       = 'UniqueId'
-            RetryIntervalSec = $RetryIntervalSec
-            RetryCount       = $RetryCount
-            DependsOn        = '[Script]InitializeDisk'
-        }
-
-        Disk ADDSvolume {
-            DiskId      = $(Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
-            DiskIdType  = 'UniqueId'
-            DriveLetter = $AdDrive
-            Size        = 20GB
-            FSFormat    = 'NTFS'
-            DependsOn   = '[WaitForDisk]Disk1'
-        }
-
-        Disk AksHCIVolume {
-            DiskId      = $(Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
-            DiskIdType  = 'UniqueId'
-            DriveLetter = $targetDrive
-            FSLabel     = 'AksHciData'
-            DependsOn   = '[Disk]ADDSvolume'
         }
 
         File "VMfolder" {
             Type            = 'Directory'
             DestinationPath = $targetVMPath
-            DependsOn       = "[Disk]AksHciVolume"
+            DependsOn       = "[Script]FormatDisk"
+        }
+
+        File "ADfolder" {
+            Type            = 'Directory'
+            DestinationPath = $targetADPath
+            DependsOn       = "[Script]FormatDisk"
         }
     }
 }
