@@ -54,7 +54,7 @@ configuration AKSHCIHost
         # STAGE 2 -> POST-HYPER-V REBOOT
         # STAGE 3 -> POST CREDSSP REBOOT
 
-        #### STAGE 1a - CREATE STORAGE SPACES V: & VM FOLDER ####
+        #### STAGE 1a - CREATE STORAGE SPACES V: & VM FOLDER ###
 
         Script StoragePool {
             SetScript  = {
