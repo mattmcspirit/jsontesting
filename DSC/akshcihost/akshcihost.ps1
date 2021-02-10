@@ -36,7 +36,7 @@ configuration AKSHCIHost
     }
     else { $dhcpStatus = "Inactive" }
 
-    [System.Management.Automation.PSCredential]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${domainName}\$($AdminCreds.UserName)", $AdminCreds.Password)
+    #[System.Management.Automation.PSCredential]$DomainCreds = New-Object System.Management.Automation.PSCredential ("${domainName}\$($AdminCreds.UserName)", $AdminCreds.Password)
 
     $ipConfig = (Get-NetAdapter -Physical | Get-NetIPConfiguration | Where-Object IPv4DefaultGateway)
     $netAdapters = Get-NetAdapter -Name ($ipConfig.InterfaceAlias) | Select-Object -First 1
