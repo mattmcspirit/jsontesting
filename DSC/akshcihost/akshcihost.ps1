@@ -95,7 +95,7 @@ configuration AKSHCIHost
         }
 
         WaitForDisk Disk1 {
-            DiskId           = "$((Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId)"
+            DiskId           = $(Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
             DiskIdType       = 'UniqueId'
             RetryIntervalSec = $RetryIntervalSec
             RetryCount       = $RetryCount
@@ -103,7 +103,7 @@ configuration AKSHCIHost
         }
 
         Disk ADDSvolume {
-            DiskId      = "$((Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId)"
+            DiskId      = $(Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
             DiskIdType  = 'UniqueId'
             DriveLetter = $AdDrive
             Size        = 20GB
@@ -112,7 +112,7 @@ configuration AKSHCIHost
         }
 
         Disk AksHCIVolume {
-            DiskId      = "$((Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId)"
+            DiskId      = $(Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
             DiskIdType  = 'UniqueId'
             DriveLetter = $targetDrive
             FSLabel     = 'AksHciData'
