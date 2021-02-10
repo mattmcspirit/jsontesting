@@ -182,7 +182,7 @@ configuration AKSHCIHost
             Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
             Ensure    = 'Present'
             ValueName = "Domain"
-            ValueData = "akshci.local"
+            ValueData = ".$DomainName"
             ValueType = "String"
         }
 
@@ -190,7 +190,7 @@ configuration AKSHCIHost
             Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
             Ensure    = 'Present'
             ValueName = "NV Domain"
-            ValueData = "akshci.local"
+            ValueData = ".$DomainName"
             ValueType = "String"
         }
 
@@ -211,7 +211,7 @@ configuration AKSHCIHost
         Registry "NewCredSSPKey3" {
             Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
             ValueName = '1'
-            ValueData = "*.$domainName"
+            ValueData = "*.$DomainName"
             ValueType = "String"
             DependsOn = "[Registry]NewCredSSPKey2"
         }
@@ -433,7 +433,7 @@ configuration AKSHCIHost
         xDhcpServerOption "AksHciDhcpServerOption" { 
             Ensure             = 'Present' 
             ScopeID            = '192.168.0.0' 
-            DnsDomain          = 'akshci.local'
+            DnsDomain          = "$DomainName"
             DnsServerIPAddress = '192.168.0.1'
             AddressFamily      = 'IPv4'
             Router             = '192.168.0.1'
@@ -443,10 +443,10 @@ configuration AKSHCIHost
         #### STAGE 2e - CONFIGURE DNS SERVER
 
         xDnsServerPrimaryZone SetPrimaryDNSZone {
-            Name          = 'akshci.local'
+            Name          = "$DomainName"
             Ensure        = 'Present'
             DependsOn     = "[script]NAT"
-            ZoneFile      = 'akshci.local.dns'
+            ZoneFile      = "$DomainName" + ".dns"
             DynamicUpdate = 'NonSecureAndSecure'
         }
 
@@ -503,14 +503,14 @@ configuration AKSHCIHost
         DnsConnectionSuffix AddSpecificSuffixHostNic
         {
             InterfaceAlias           = 'Ethernet'
-            ConnectionSpecificSuffix = 'akshci.local'
+            ConnectionSpecificSuffix = "$DomainName"
             DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
         }
 
         DnsConnectionSuffix AddSpecificSuffixNATNic
         {
             InterfaceAlias           = "vEthernet `($vSwitchNameHost`)"
-            ConnectionSpecificSuffix = 'akshci.local'
+            ConnectionSpecificSuffix = "$DomainName"
             DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
         }
 
@@ -525,7 +525,7 @@ configuration AKSHCIHost
         xCredSSP Client {
             Ensure         = "Present"
             Role           = "Client"
-            DelegateComputers = "$env:COMPUTERNAME" + ".$domainName"
+            DelegateComputers = "$env:COMPUTERNAME" + ".$DomainName"
             DependsOn      = "[xCredSSP]Server"
             SuppressReboot = $true
         }
@@ -534,13 +534,13 @@ configuration AKSHCIHost
 
         Script ConfigureWinRM {
             SetScript  = {
-                Set-Item WSMan:\localhost\Client\TrustedHosts "*.$domainName" -Force
+                Set-Item WSMan:\localhost\Client\TrustedHosts "*.$DomainName" -Force
             }
             TestScript = {
-                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$domainName"
+                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$DomainName"
             }
             GetScript  = {
-                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$domainName") { 'Present' } Else { 'Absent' } }
+                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$DomainName") { 'Present' } Else { 'Absent' } }
             }
             DependsOn  = "[xCredSSP]Client"
         }
