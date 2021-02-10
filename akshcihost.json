@@ -546,7 +546,7 @@
             "properties": {
                 "mode": "Incremental",
                 "templateLink": {
-                    "uri": "[uri(variables('artifactsLocation'), concat('/updatevnet.json'))]",
+                    "uri": "[uri(variables('artifactsLocation'), concat('json/updatevnet.json'))]",
                     "contentVersion": "1.0.0.0"
                 },
                 "parameters": {
