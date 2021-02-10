@@ -94,32 +94,29 @@ configuration AKSHCIHost
             DependsOn  = "[Script]VirtualDisk"
         }
 
-        WaitForDisk Disk1
-        {
-             DiskId = (Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
-             DiskIdType = 'UniqueId'
-             RetryIntervalSec = 60
-             RetryCount = 60
-             DependsOn = '[Script]InitializeDisk'
+        WaitForDisk Disk1 {
+            DiskId           = (Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
+            DiskIdType       = 'UniqueId'
+            RetryIntervalSec = $RetryIntervalSec
+            RetryCount       = $RetryCount
+            DependsOn        = '[Script]InitializeDisk'
         }
 
-        Disk ADDSvolume
-        {
-             DiskId = (Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
-             DiskIdType = 'UniqueId'
-             DriveLetter = $AdDrive
-             Size = 20GB
-             FSFormat = 'NTFS'
-             DependsOn = '[WaitForDisk]Disk1'
+        Disk ADDSvolume {
+            DiskId      = (Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
+            DiskIdType  = 'UniqueId'
+            DriveLetter = $AdDrive
+            Size        = 20GB
+            FSFormat    = 'NTFS'
+            DependsOn   = '[WaitForDisk]Disk1'
         }
 
-        Disk AksHCIVolume
-        {
-             DiskId = (Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
-             DiskIdType = 'UniqueId'
-             DriveLetter = $targetDrive
-             FSLabel = 'AksHciData'
-             DependsOn = '[Disk]ADDSvolume'
+        Disk AksHCIVolume {
+            DiskId      = (Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
+            DiskIdType  = 'UniqueId'
+            DriveLetter = $targetDrive
+            FSLabel     = 'AksHciData'
+            DependsOn   = '[Disk]ADDSvolume'
         }
 
         File "VMfolder" {
