@@ -81,29 +81,51 @@ configuration AKSHCIHost
             }
             DependsOn  = "[Script]StoragePool"
         }
-        Script FormatDisk {
+        Script InitializeDisk {
             SetScript  = {
-                $vDisk = Get-VirtualDisk -FriendlyName AksHciDisk
-                if ($vDisk | Get-Disk | Where-Object PartitionStyle -eq 'raw') {
-                    $vDisk | Get-Disk | Initialize-Disk -Passthru | New-Partition -DriveLetter $Using:targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
-                }
-                elseif ($vDisk | Get-Disk | Where-Object PartitionStyle -eq 'GPT') {
-                    $vDisk | Get-Disk | New-Partition -DriveLetter $Using:targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
-                }
+                Get-VirtualDisk -FriendlyName AksHciDisk | Get-Disk | Initialize-Disk
             }
             TestScript = { 
-                (Get-Volume -ErrorAction SilentlyContinue -FileSystemLabel AksHciData).FileSystem -eq 'NTFS'
+                (Get-Disk -FriendlyName AksHciDisk).PartitionStyle -eq 'GPT'
             }
             GetScript  = {
-                @{Ensure = if ((Get-Volume -FileSystemLabel AksHciData).FileSystem -eq 'NTFS') { 'Present' } Else { 'Absent' } }
+                @{Ensure = if ((Get-Disk -FriendlyName AksHciDisk).PartitionStyle -eq 'GPT') { 'Present' } Else { 'Absent' } }
             }
             DependsOn  = "[Script]VirtualDisk"
+        }
+
+        WaitForDisk Disk1
+        {
+             DiskId = (Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
+             DiskIdType = 'UniqueId'
+             RetryIntervalSec = 60
+             RetryCount = 60
+             DependsOn = '[Script]InitializeDisk'
+        }
+
+        Disk ADDSvolume
+        {
+             DiskId = (Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
+             DiskIdType = 'UniqueId'
+             DriveLetter = $AdDrive
+             Size = 20GB
+             FSFormat = 'NTFS'
+             DependsOn = '[WaitForDisk]Disk1'
+        }
+
+        Disk AksHCIVolume
+        {
+             DiskId = (Get-VirtualDisk -FriendlyName AksHciDisk).UniqueId
+             DiskIdType = 'UniqueId'
+             DriveLetter = $targetDrive
+             FSLabel = 'AksHciData'
+             DependsOn = '[Disk]ADDSvolume'
         }
 
         File "VMfolder" {
             Type            = 'Directory'
             DestinationPath = $targetVMPath
-            DependsOn       = "[Script]FormatDisk"
+            DependsOn       = "[Disk]AksHciVolume"
         }
 
         #### STAGE 1b - SET WINDOWS DEFENDER EXCLUSION FOR VM STORAGE ####
