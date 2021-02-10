@@ -40,7 +40,7 @@ configuration AKSHCIHost
 
     $ipConfig = (Get-NetAdapter -Physical | Get-NetIPConfiguration | Where-Object IPv4DefaultGateway)
     $netAdapters = Get-NetAdapter -Name ($ipConfig.InterfaceAlias) | Select-Object -First 1
-    $InterfaceAlias=$($netAdapters.Name)
+    $InterfaceAlias = $($netAdapters.Name)
 
     Node localhost
     {
@@ -275,7 +275,7 @@ configuration AKSHCIHost
             Address        = '127.0.0.1'
             InterfaceAlias = $InterfaceAlias
             AddressFamily  = 'IPv4'
-	        DependsOn = "[WindowsFeature]DNS"
+            DependsOn      = "[WindowsFeature]DNS"
         }
 
         WindowsFeature "RSAT-Clustering" {
@@ -360,7 +360,7 @@ configuration AKSHCIHost
             Address        = '127.0.0.1' 
             InterfaceAlias = "vEthernet `($vSwitchNameMgmt`)"
             AddressFamily  = 'IPv4'
-	        DependsOn = "[IPAddress]New IP for vEthernet $vSwitchNameMgmt"
+            DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameMgmt"
         }
 
         #### STAGE 2b - PRIMARY NIC CONFIG ####
@@ -517,11 +517,11 @@ configuration AKSHCIHost
             SuppressReboot = $true
         }
         xCredSSP Client {
-            Ensure            = "Present"
-            Role              = "Client"
+            Ensure         = "Present"
+            Role           = "Client"
             DelegateComputers = "$env:COMPUTERNAME" + ".$domain"
-            DependsOn         = "[xCredSSP]Server"
-            SuppressReboot    = $true
+            DependsOn      = "[xCredSSP]Server"
+            SuppressReboot = $true
         }
 
         #### STAGE 3a - CONFIGURE WinRM
