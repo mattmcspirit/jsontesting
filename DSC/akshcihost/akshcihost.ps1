@@ -15,7 +15,6 @@ configuration AKSHCIHost
         [string]$vSwitchNameHost = "InternalNAT",
         [String]$targetDrive = "V",
         [String]$targetVMPath = "$targetDrive" + ":\VMs",
-        #[String]$targetADPath = "$targetDrive" + ":\ADDS",
         [String]$baseVHDFolderPath = "$targetVMPath\base"
     ) 
     
@@ -105,11 +104,6 @@ configuration AKSHCIHost
             DestinationPath = $targetVMPath
             DependsOn       = "[Script]FormatDisk"
         }
-        <# File "ADfolder" {
-            Type            = 'Directory'
-            DestinationPath = $targetADPath
-            DependsOn       = "[Script]FormatDisk"
-        } #>
 
         #### STAGE 1b - SET WINDOWS DEFENDER EXCLUSION FOR VM STORAGE ####
 
