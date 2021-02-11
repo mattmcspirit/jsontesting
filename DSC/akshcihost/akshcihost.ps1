@@ -75,14 +75,25 @@ configuration AKSHCIHost
             AutoUpgrade = $true
             DependsOn   = '[cChocoInstaller]InstallChoco'
         }
-        
-        cChocoPackageInstaller "Install WAC" {
+        <# cChocoPackageInstaller "Install WAC" {
             Name        = 'windows-admin-center'
             Ensure      = 'Present'
             AutoUpgrade = $true
             DependsOn   = '[cChocoInstaller]InstallChoco'
             Params      = "'/Port:443'"
+        } #>
+
+        Script "Install WAC" {
+            SetScript  = { 
+                Invoke-Command -ComputerName $env:computerName -ScriptBlock { choco install windows-admin-center --params "'/Port:443'"  }
+            }
+            GetScript  = { @{} 
+            }
+            TestScript = { $false }
+            DependsOn   = '[cChocoInstaller]InstallChoco'
         }
+
+
 
         #### STAGE 1b - CREATE STORAGE SPACES V: & VM FOLDER ####
 
@@ -96,7 +107,7 @@ configuration AKSHCIHost
             GetScript  = {
                 @{Ensure = if ((Get-StoragePool -FriendlyName AksHciPool).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
             }
-            DependsOn  = "[cChocoPackageInstaller]Install WAC"
+            DependsOn  = "[Script]Install WAC"
         }
         Script VirtualDisk {
             SetScript  = {
@@ -236,13 +247,13 @@ configuration AKSHCIHost
         WindowsFeature DNS { 
             Ensure    = "Present" 
             Name      = "DNS"
-            DependsOn = "[cChocoPackageInstaller]Install WAC"
+            DependsOn = "[Script]Install WAC"
         }
 
         WindowsFeature "Enable Deduplication" { 
             Ensure    = "Present" 
             Name      = "FS-Data-Deduplication"
-            DependsOn = "[cChocoPackageInstaller]Install WAC"	
+            DependsOn = "[Script]Install WAC"	
         }
 
         Script EnableDNSDiags {
@@ -300,13 +311,13 @@ configuration AKSHCIHost
         WindowsFeature "RSAT-Clustering" {
             Name      = "RSAT-Clustering"
             Ensure    = "Present"
-            DependsOn = "[cChocoPackageInstaller]Install WAC"
+            DependsOn = "[Script]Install WAC"
         }
 
         WindowsFeature "Install DHCPServer" {
             Name      = 'DHCP'
             Ensure    = 'Present'
-            DependsOn = "[cChocoPackageInstaller]Install WAC"
+            DependsOn = "[Script]Install WAC"
         }
 
         WindowsFeature DHCPTools {
@@ -326,7 +337,7 @@ configuration AKSHCIHost
         WindowsFeature "Hyper-V" {
             Name      = "Hyper-V"
             Ensure    = "Present"
-            DependsOn = "[cChocoPackageInstaller]Install WAC"
+            DependsOn = "[Script]Install WAC"
         }
 
         WindowsFeature "RSAT-Hyper-V-Tools" {
