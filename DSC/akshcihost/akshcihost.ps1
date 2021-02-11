@@ -15,7 +15,7 @@ configuration AKSHCIHost
         [string]$vSwitchNameHost = "InternalNAT",
         [String]$targetDrive = "V",
         [String]$targetVMPath = "$targetDrive" + ":\VMs",
-        #[String]$targetADPath = "$targetDrive" + ":\ADDS",
+        [String]$targetADPath = "$targetDrive" + ":\ADDS",
         [String]$baseVHDFolderPath = "$targetVMPath\base"
     ) 
     
@@ -30,6 +30,7 @@ configuration AKSHCIHost
     Import-DscResource -ModuleName 'cChoco'
     Import-DscResource -ModuleName 'DSCR_Shortcut'
     Import-DscResource -ModuleName 'xCredSSP'
+    Import-DscResource -ModuleName 'xActiveDirectory'
 
     if ($enableDHCP -eq "Enabled") {
         $dhcpStatus = "Active"
@@ -105,11 +106,12 @@ configuration AKSHCIHost
             DestinationPath = $targetVMPath
             DependsOn       = "[Script]FormatDisk"
         }
-        <# File "ADfolder" {
+        
+        File "ADfolder" {
             Type            = 'Directory'
             DestinationPath = $targetADPath
             DependsOn       = "[Script]FormatDisk"
-        } #>
+        }
 
         #### STAGE 1b - SET WINDOWS DEFENDER EXCLUSION FOR VM STORAGE ####
 
@@ -169,6 +171,8 @@ configuration AKSHCIHost
             ValueName = ''
         }
 
+        <#
+
         Registry "Set Network Private Profile Default" {
             Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\CurrentVersion\NetworkList\Signatures\010103000F0000F0010000000F0000F0C967A3643C3AD745950DA7859209176EF5B87C875FA20DF21951640E807D7C24'
             Ensure    = 'Present'
@@ -177,7 +181,6 @@ configuration AKSHCIHost
             ValueType = "Dword"
         }
 
-        <#
         Registry "SetWorkgroupDomain" {
             Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
             Ensure    = 'Present'
@@ -193,8 +196,6 @@ configuration AKSHCIHost
             ValueData = "$DomainName"
             ValueType = "String"
         }
-
-        #>
 
         Registry "NewCredSSPKey" {
             Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
@@ -213,10 +214,12 @@ configuration AKSHCIHost
         Registry "NewCredSSPKey3" {
             Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
             ValueName = '1'
-            ValueData = "*"
+            ValueData = "*.$DomainName"
             ValueType = "String"
             DependsOn = "[Registry]NewCredSSPKey2"
         }
+
+        #>
 
         ScheduledTask "Disable Server Manager at Startup"
         {
@@ -284,6 +287,38 @@ configuration AKSHCIHost
             InterfaceAlias = $InterfaceAlias
             AddressFamily  = 'IPv4'
             DependsOn      = "[WindowsFeature]DNS"
+        }
+
+        WindowsFeature ADDSInstall 
+        { 
+            Ensure = "Present" 
+            Name = "AD-Domain-Services"
+	        DependsOn="[WindowsFeature]DNS" 
+        } 
+
+        WindowsFeature ADDSTools
+        {
+            Ensure = "Present"
+            Name = "RSAT-ADDS-Tools"
+            DependsOn = "[WindowsFeature]ADDSInstall"
+        }
+
+        WindowsFeature ADAdminCenter
+        {
+            Ensure = "Present"
+            Name = "RSAT-AD-AdminCenter"
+            DependsOn = "[WindowsFeature]ADDSInstall"
+        }
+         
+        xADDomain FirstDS 
+        {
+            DomainName = $DomainName
+            DomainAdministratorCredential = $DomainCreds
+            SafemodeAdministratorPassword = $DomainCreds
+            DatabasePath = "$targetADPath\NTDS"
+            LogPath = "$targetADPath\NTDS"
+            SysvolPath = "$targetADPath\SYSVOL"
+	        DependsOn = @("[File]ADfolder", "[WindowsFeature]ADDSInstall")
         }
 
         WindowsFeature "RSAT-Clustering" {
@@ -369,6 +404,14 @@ configuration AKSHCIHost
             InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
             AddressFamily  = 'IPv4'
             DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
+        }
+
+        xDhcpServerAuthorization "Authorize DHCP"
+        {
+            Ensure = 'Present'
+            DependsOn = @('[WindowsFeature]Install DHCPServer')
+            DnsName = [System.Net.Dns]::GetHostByName($env:computerName).hostname
+            IPAddress = '192.168.0.1'
         }
 
         #### STAGE 2b - PRIMARY NIC CONFIG ####
@@ -502,7 +545,6 @@ configuration AKSHCIHost
         }
         #>
 
-        <#
         DnsConnectionSuffix AddSpecificSuffixHostNic
         {
             InterfaceAlias           = 'Ethernet'
@@ -516,8 +558,6 @@ configuration AKSHCIHost
             ConnectionSpecificSuffix = "$DomainName"
             DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
         }
-        
-        #>
 
         #### STAGE 2h - CONFIGURE CREDSSP & WinRM
 
@@ -528,29 +568,27 @@ configuration AKSHCIHost
             SuppressReboot = $true
         }
         xCredSSP Client {
-            Ensure         = "Present"
-            Role           = "Client"
-            DelegateComputers = "$env:COMPUTERNAME"
-            DependsOn      = "[xCredSSP]Server"
-            SuppressReboot = $true
+            Ensure            = "Present"
+            Role              = "Client"
+            DelegateComputers = "$env:COMPUTERNAME" + ".$DomainName"
+            DependsOn         = "[xCredSSP]Server"
+            SuppressReboot    = $true
         }
 
         #### STAGE 3a - CONFIGURE WinRM
 
         Script ConfigureWinRM {
             SetScript  = {
-                Set-Item WSMan:\localhost\Client\TrustedHosts "*" -Force
+                Set-Item WSMan:\localhost\Client\TrustedHosts "*.$DomainName" -Force
             }
             TestScript = {
-                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*"
+                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$DomainName"
             }
             GetScript  = {
-                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*") { 'Present' } Else { 'Absent' } }
+                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$DomainName") { 'Present' } Else { 'Absent' } }
             }
             DependsOn  = "[xCredSSP]Client"
         }
-
-        #>
 
         #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
 
