@@ -113,6 +113,39 @@ configuration AKSHCIHost
             DependsOn       = "[Script]FormatDisk"
         }
 
+        #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
+
+        cChocoInstaller InstallChoco {
+            InstallDir = "c:\choco"
+        }
+                    
+        cChocoFeature allowGlobalConfirmation {
+            FeatureName = "allowGlobalConfirmation"
+            Ensure      = 'Present'
+            DependsOn   = '[cChocoInstaller]InstallChoco'
+        }
+                
+        cChocoFeature useRememberedArgumentsForUpgrades {
+            FeatureName = "useRememberedArgumentsForUpgrades"
+            Ensure      = 'Present'
+            DependsOn   = '[cChocoInstaller]InstallChoco'
+        }
+                
+        cChocoPackageInstaller "Install Chromium Edge" {
+            Name        = 'microsoft-edge'
+            Ensure      = 'Present'
+            AutoUpgrade = $true
+            DependsOn   = '[cChocoInstaller]InstallChoco'
+        }
+        
+        cChocoPackageInstaller "Install WAC" {
+            Name        = 'windows-admin-center'
+            Ensure      = 'Present'
+            AutoUpgrade = $true
+            DependsOn   = '[cChocoInstaller]InstallChoco'
+            Params      = "'/Port:443'"
+        }
+
         #### STAGE 1b - SET WINDOWS DEFENDER EXCLUSION FOR VM STORAGE ####
 
         Script defenderExclusions {
@@ -240,8 +273,8 @@ configuration AKSHCIHost
         WindowsFeature ADDSInstall { 
             Ensure    = "Present" 
             Name      = "AD-Domain-Services"
-            DependsOn = "[WindowsFeature]DNS" 
-        } 
+            DependsOn = @("[WindowsFeature]DNS", "[cChocoPackageInstaller]Install WAC")
+        }
 
         WindowsFeature ADDSTools {
             Ensure    = "Present"
@@ -431,30 +464,6 @@ configuration AKSHCIHost
             }
             TestScript = { $false }
             DependsOn  = "[xDhcpServerOption]AksHciDhcpServerOption"
-        }
-        #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
-
-        cChocoInstaller InstallChoco {
-            InstallDir = "c:\choco"
-        }
-            
-        cChocoFeature allowGlobalConfirmation {
-            FeatureName = "allowGlobalConfirmation"
-            Ensure      = 'Present'
-            DependsOn   = '[cChocoInstaller]installChoco'
-        }
-        
-        cChocoFeature useRememberedArgumentsForUpgrades {
-            FeatureName = "useRememberedArgumentsForUpgrades"
-            Ensure      = 'Present'
-            DependsOn   = '[cChocoInstaller]installChoco'
-        }
-        
-        cChocoPackageInstaller "Install Chromium Edge" {
-            Name        = 'microsoft-edge'
-            Ensure      = 'Present'
-            AutoUpgrade = $true
-            DependsOn   = '[cChocoInstaller]installChoco'
         }
     }
 }
