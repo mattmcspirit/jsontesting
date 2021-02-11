@@ -194,6 +194,8 @@ configuration AKSHCIHost
             ValueType = "String"
         }
 
+        #>
+
         Registry "NewCredSSPKey" {
             Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
             Ensure    = 'Present'
@@ -211,11 +213,10 @@ configuration AKSHCIHost
         Registry "NewCredSSPKey3" {
             Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
             ValueName = '1'
-            ValueData = "*.$DomainName"
+            ValueData = "*"
             ValueType = "String"
             DependsOn = "[Registry]NewCredSSPKey2"
         }
-        #>
 
         ScheduledTask "Disable Server Manager at Startup"
         {
@@ -312,7 +313,7 @@ configuration AKSHCIHost
         WindowsFeature "Hyper-V" {
             Name      = "Hyper-V"
             Ensure    = "Present"
-            # DependsOn = "[Registry]NewCredSSPKey3"
+            DependsOn = "[Registry]NewCredSSPKey3"
         }
 
         WindowsFeature "RSAT-Hyper-V-Tools" {
@@ -516,6 +517,7 @@ configuration AKSHCIHost
             DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
         }
         
+        #>
 
         #### STAGE 2h - CONFIGURE CREDSSP & WinRM
 
@@ -528,7 +530,7 @@ configuration AKSHCIHost
         xCredSSP Client {
             Ensure         = "Present"
             Role           = "Client"
-            DelegateComputers = "$env:COMPUTERNAME" + ".$DomainName"
+            DelegateComputers = "$env:COMPUTERNAME"
             DependsOn      = "[xCredSSP]Server"
             SuppressReboot = $true
         }
@@ -537,13 +539,13 @@ configuration AKSHCIHost
 
         Script ConfigureWinRM {
             SetScript  = {
-                Set-Item WSMan:\localhost\Client\TrustedHosts "*.$DomainName" -Force
+                Set-Item WSMan:\localhost\Client\TrustedHosts "*" -Force
             }
             TestScript = {
-                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$DomainName"
+                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*"
             }
             GetScript  = {
-                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$DomainName") { 'Present' } Else { 'Absent' } }
+                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*") { 'Present' } Else { 'Absent' } }
             }
             DependsOn  = "[xCredSSP]Client"
         }
