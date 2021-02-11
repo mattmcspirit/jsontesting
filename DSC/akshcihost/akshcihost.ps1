@@ -524,7 +524,7 @@ configuration AKSHCIHost
         xCredSSP Server {
             Ensure         = "Present"
             Role           = "Server"
-            DependsOn      = "[DnsConnectionSuffix]AddSpecificSuffixNATNic"
+            DependsOn      = "[xDnsServerPrimaryZone]SetReverseLookupZone"
             SuppressReboot = $true
         }
         xCredSSP Client {
