@@ -51,40 +51,11 @@ configuration AKSHCIHost
             ConfigurationMode  = 'ApplyOnly'
         }
 
-        #### STAGE 1a - INSTALL CHOCO & DEPLOY EDGE
+        # STAGE 1 -> PRE-HYPER-V REBOOT
+        # STAGE 2 -> POST-HYPER-V REBOOT
+        # STAGE 3 -> POST CREDSSP REBOOT
 
-        cChocoInstaller InstallChoco {
-            InstallDir = "c:\choco"
-        }
-                    
-        cChocoFeature allowGlobalConfirmation {
-            FeatureName = "allowGlobalConfirmation"
-            Ensure      = 'Present'
-            DependsOn   = '[cChocoInstaller]InstallChoco'
-        }
-                
-        cChocoFeature useRememberedArgumentsForUpgrades {
-            FeatureName = "useRememberedArgumentsForUpgrades"
-            Ensure      = 'Present'
-            DependsOn   = '[cChocoInstaller]InstallChoco'
-        }
-                
-        cChocoPackageInstaller "Install Chromium Edge" {
-            Name        = 'microsoft-edge'
-            Ensure      = 'Present'
-            AutoUpgrade = $true
-            DependsOn   = '[cChocoInstaller]InstallChoco'
-        }
-        
-        cChocoPackageInstaller "Install WAC" {
-            Name        = 'windows-admin-center'
-            Ensure      = 'Present'
-            AutoUpgrade = $true
-            DependsOn   = '[cChocoInstaller]InstallChoco'
-            Params      = "'/Port:443'"
-        }
-
-        #### STAGE 1b - CREATE STORAGE SPACES V: & VM FOLDER ####
+        #### STAGE 1a - CREATE STORAGE SPACES V: & VM FOLDER ####
 
         Script StoragePool {
             SetScript  = {
@@ -96,7 +67,6 @@ configuration AKSHCIHost
             GetScript  = {
                 @{Ensure = if ((Get-StoragePool -FriendlyName AksHciPool).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
             }
-            DependsOn  = "[cChocoPackageInstaller]Install WAC"
         }
         Script VirtualDisk {
             SetScript  = {
@@ -143,7 +113,7 @@ configuration AKSHCIHost
             DependsOn       = "[Script]FormatDisk"
         }
 
-        #### STAGE 1c - SET WINDOWS DEFENDER EXCLUSION FOR VM STORAGE ####
+        #### STAGE 1b - SET WINDOWS DEFENDER EXCLUSION FOR VM STORAGE ####
 
         Script defenderExclusions {
             SetScript  = {
@@ -158,10 +128,10 @@ configuration AKSHCIHost
                 $exclusionPath = "$Using:targetDrive" + ":\"
                 @{Ensure = if ((Get-MpPreference).ExclusionPath -contains "$exclusionPath") { 'Present' } Else { 'Absent' } }
             }
-            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
+            DependsOn  = "[File]VMfolder"
         }
 
-        #### STAGE 1d - REGISTRY & SCHEDULED TASK TWEAKS ####
+        #### STAGE 1c - REGISTRY & SCHEDULED TASK TWEAKS ####
 
         Registry "Disable Internet Explorer ESC for Admin" {
             Key       = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"
@@ -207,7 +177,7 @@ configuration AKSHCIHost
             TaskPath = '\Microsoft\Windows\Server Manager'
         }
 
-        #### STAGE 1e - CUSTOM FIREWALL BASED ON ARM TEMPLATE ####
+        #### STAGE 1d - CUSTOM FIREWALL BASED ON ARM TEMPLATE ####
 
         if ($customRdpPort -ne "3389") {
 
@@ -231,18 +201,16 @@ configuration AKSHCIHost
             }
         }
 
-        #### STAGE 1f - ENABLE ROLES & FEATURES ####
+        #### STAGE 1e - ENABLE ROLES & FEATURES ####
 
         WindowsFeature DNS { 
-            Ensure    = "Present" 
-            Name      = "DNS"
-            DependsOn = "[cChocoPackageInstaller]Install WAC"
+            Ensure = "Present" 
+            Name   = "DNS"		
         }
 
         WindowsFeature "Enable Deduplication" { 
-            Ensure    = "Present" 
-            Name      = "FS-Data-Deduplication"
-            DependsOn = "[cChocoPackageInstaller]Install WAC"	
+            Ensure = "Present" 
+            Name   = "FS-Data-Deduplication"		
         }
 
         Script EnableDNSDiags {
@@ -272,8 +240,8 @@ configuration AKSHCIHost
         WindowsFeature ADDSInstall { 
             Ensure    = "Present" 
             Name      = "AD-Domain-Services"
-            DependsOn = @("[WindowsFeature]DNS")
-        }
+            DependsOn = "[WindowsFeature]DNS" 
+        } 
 
         WindowsFeature ADDSTools {
             Ensure    = "Present"
@@ -298,15 +266,13 @@ configuration AKSHCIHost
         }
 
         WindowsFeature "RSAT-Clustering" {
-            Name      = "RSAT-Clustering"
-            Ensure    = "Present"
-            DependsOn = "[cChocoPackageInstaller]Install WAC"
+            Name   = "RSAT-Clustering"
+            Ensure = "Present"
         }
 
         WindowsFeature "Install DHCPServer" {
-            Name      = 'DHCP'
-            Ensure    = 'Present'
-            DependsOn = "[cChocoPackageInstaller]Install WAC"
+            Name   = 'DHCP'
+            Ensure = 'Present'
         }
 
         WindowsFeature DHCPTools {
@@ -324,9 +290,8 @@ configuration AKSHCIHost
         }
 
         WindowsFeature "Hyper-V" {
-            Name      = "Hyper-V"
-            Ensure    = "Present"
-            DependsOn = "[cChocoPackageInstaller]Install WAC"
+            Name   = "Hyper-V"
+            Ensure = "Present"
         }
 
         WindowsFeature "RSAT-Hyper-V-Tools" {
@@ -391,7 +356,16 @@ configuration AKSHCIHost
             IPAddress = '192.168.0.1'
         }
 
-        #### STAGE 2b - CONFIGURE InternaNAT NIC
+        #### STAGE 2b - PRIMARY NIC CONFIG ####
+
+        NetAdapterBinding DisableIPv6Host
+        {
+            InterfaceAlias = 'Ethernet'
+            ComponentId    = 'ms_tcpip6'
+            State          = 'Disabled'
+        }
+
+        #### STAGE 2c - CONFIGURE InternaNAT NIC
 
         script NAT {
             GetScript  = {
@@ -416,16 +390,6 @@ configuration AKSHCIHost
         NetAdapterBinding DisableIPv6NAT
         {
             InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
-            ComponentId    = 'ms_tcpip6'
-            State          = 'Disabled'
-            DependsOn      = "[Script]NAT"
-        }
-
-        #### STAGE 2c - PRIMARY NIC CONFIG ####
-
-        NetAdapterBinding DisableIPv6Host
-        {
-            InterfaceAlias = 'Ethernet'
             ComponentId    = 'ms_tcpip6'
             State          = 'Disabled'
             DependsOn      = "[Script]NAT"
@@ -456,7 +420,7 @@ configuration AKSHCIHost
             DependsOn          = "[xDhcpServerScope]AksHciDhcpScope"
         }
 
-        #### STAGE 2e - FINALIZE DHCP
+        #### STAGE 2f - FINALIZE DHCP
 
         Script SetDHCPDNSSetting {
             SetScript  = { 
@@ -467,6 +431,30 @@ configuration AKSHCIHost
             }
             TestScript = { $false }
             DependsOn  = "[xDhcpServerOption]AksHciDhcpServerOption"
+        }
+        #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
+
+        cChocoInstaller InstallChoco {
+            InstallDir = "c:\choco"
+        }
+            
+        cChocoFeature allowGlobalConfirmation {
+            FeatureName = "allowGlobalConfirmation"
+            Ensure      = 'Present'
+            DependsOn   = '[cChocoInstaller]installChoco'
+        }
+        
+        cChocoFeature useRememberedArgumentsForUpgrades {
+            FeatureName = "useRememberedArgumentsForUpgrades"
+            Ensure      = 'Present'
+            DependsOn   = '[cChocoInstaller]installChoco'
+        }
+        
+        cChocoPackageInstaller "Install Chromium Edge" {
+            Name        = 'microsoft-edge'
+            Ensure      = 'Present'
+            AutoUpgrade = $true
+            DependsOn   = '[cChocoInstaller]installChoco'
         }
     }
 }
