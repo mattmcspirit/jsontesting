@@ -75,25 +75,25 @@ configuration AKSHCIHost
             AutoUpgrade = $true
             DependsOn   = '[cChocoInstaller]InstallChoco'
         }
-        <# cChocoPackageInstaller "Install WAC" {
+        
+        <#
+        cChocoPackageInstaller "Install WAC" {
             Name        = 'windows-admin-center'
             Ensure      = 'Present'
             AutoUpgrade = $true
             DependsOn   = '[cChocoInstaller]InstallChoco'
             Params      = "'/Port:443'"
-        } #>
+        }#>
 
         Script "Install WAC" {
             SetScript  = { 
-                Invoke-Command -ComputerName $env:computerName -ScriptBlock { choco install windows-admin-center --params "'/Port:443'"  }
+                Invoke-Command -ComputerName $env:computerName -Credential $Using:Admincreds -ScriptBlock { choco install windows-admin-center --params "'/Port:443'" }
             }
             GetScript  = { @{} 
             }
             TestScript = { $false }
             DependsOn   = '[cChocoInstaller]InstallChoco'
         }
-
-
 
         #### STAGE 1b - CREATE STORAGE SPACES V: & VM FOLDER ####
 
