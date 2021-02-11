@@ -348,7 +348,7 @@ configuration AKSHCIHost
         WindowsFeature "Hyper-V" {
             Name      = "Hyper-V"
             Ensure    = "Present"
-            DependsOn = "[Registry]NewCredSSPKey3"
+            # DependsOn = "[Registry]NewCredSSPKey3"
         }
 
         WindowsFeature "RSAT-Hyper-V-Tools" {
@@ -487,6 +487,8 @@ configuration AKSHCIHost
 
         #### STAGE 2e - CONFIGURE DNS SERVER
 
+        <#
+
         xDnsServerPrimaryZone SetPrimaryDNSZone {
             Name          = "$DomainName"
             Ensure        = 'Present'
@@ -503,13 +505,13 @@ configuration AKSHCIHost
             DynamicUpdate = 'NonSecureAndSecure'
         }
 
-        <#
         xDnsServerSetting SetListener {
             Name            = 'AksHciListener'
             ListenAddresses = '192.168.0.1'
             Forwarders      = @('1.1.1.1', '1.0.0.1')
             DependsOn       = "[xDnsServerPrimaryZone]SetReverseLookupZone"
         }
+        
         #>
 
         #### STAGE 2f - FINALIZE DHCP
@@ -522,7 +524,7 @@ configuration AKSHCIHost
             GetScript  = { @{} 
             }
             TestScript = { $false }
-            DependsOn  = "[xDnsServerPrimaryZone]SetReverseLookupZone"
+            DependsOn  = "[xDhcpServerOption]AksHciDhcpServerOption"
         }
 
         #### STAGE 2g - CONFIGURE DNS CLIENT ON NICS
@@ -543,7 +545,7 @@ configuration AKSHCIHost
             AddressFamily  = 'IPv4'
             DependsOn      = @("[WindowsFeature]DNS", "[IPAddress]New IP for vEthernet $vSwitchNameHost", "[xDnsServerSetting]SetListener")
         }
-        #>
+        
 
         DnsConnectionSuffix AddSpecificSuffixHostNic
         {
@@ -589,6 +591,8 @@ configuration AKSHCIHost
             }
             DependsOn  = "[xCredSSP]Client"
         }
+
+        #>
 
         #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
 
