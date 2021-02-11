@@ -289,36 +289,32 @@ configuration AKSHCIHost
             DependsOn      = "[WindowsFeature]DNS"
         }
 
-        WindowsFeature ADDSInstall 
-        { 
-            Ensure = "Present" 
-            Name = "AD-Domain-Services"
-	        DependsOn="[WindowsFeature]DNS" 
+        WindowsFeature ADDSInstall { 
+            Ensure    = "Present" 
+            Name      = "AD-Domain-Services"
+            DependsOn = "[WindowsFeature]DNS" 
         } 
 
-        WindowsFeature ADDSTools
-        {
-            Ensure = "Present"
-            Name = "RSAT-ADDS-Tools"
+        WindowsFeature ADDSTools {
+            Ensure    = "Present"
+            Name      = "RSAT-ADDS-Tools"
             DependsOn = "[WindowsFeature]ADDSInstall"
         }
 
-        WindowsFeature ADAdminCenter
-        {
-            Ensure = "Present"
-            Name = "RSAT-AD-AdminCenter"
+        WindowsFeature ADAdminCenter {
+            Ensure    = "Present"
+            Name      = "RSAT-AD-AdminCenter"
             DependsOn = "[WindowsFeature]ADDSInstall"
         }
          
-        xADDomain FirstDS 
-        {
-            DomainName = $DomainName
+        xADDomain FirstDS {
+            DomainName                    = $DomainName
             DomainAdministratorCredential = $DomainCreds
             SafemodeAdministratorPassword = $DomainCreds
-            DatabasePath = "$targetADPath\NTDS"
-            LogPath = "$targetADPath\NTDS"
-            SysvolPath = "$targetADPath\SYSVOL"
-	        DependsOn = @("[File]ADfolder", "[WindowsFeature]ADDSInstall")
+            DatabasePath                  = "$targetADPath\NTDS"
+            LogPath                       = "$targetADPath\NTDS"
+            SysvolPath                    = "$targetADPath\SYSVOL"
+            DependsOn                     = @("[File]ADfolder", "[WindowsFeature]ADDSInstall")
         }
 
         WindowsFeature "RSAT-Clustering" {
@@ -346,8 +342,8 @@ configuration AKSHCIHost
         }
 
         WindowsFeature "Hyper-V" {
-            Name      = "Hyper-V"
-            Ensure    = "Present"
+            Name   = "Hyper-V"
+            Ensure = "Present"
             # DependsOn = "[Registry]NewCredSSPKey3"
         }
 
@@ -406,24 +402,25 @@ configuration AKSHCIHost
             DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
         }
 
-        xDhcpServerAuthorization "Authorize DHCP"
-        {
-            Ensure = 'Present'
+        xDhcpServerAuthorization "Authorize DHCP" {
+            Ensure    = 'Present'
             DependsOn = @('[WindowsFeature]Install DHCPServer')
-            DnsName = [System.Net.Dns]::GetHostByName($env:computerName).hostname
+            DnsName   = [System.Net.Dns]::GetHostByName($env:computerName).hostname
             IPAddress = '192.168.0.1'
         }
 
         #### STAGE 2b - PRIMARY NIC CONFIG ####
 
-        NetConnectionProfile SetProfile
+        <tConnectionProfile SetProfile
         {
             InterfaceAlias  = 'Ethernet'
             NetworkCategory = 'Private'
         }
+        #>
 
         NetAdapterBinding DisableIPv6Host
         {
+            #>
             InterfaceAlias = 'Ethernet'
             ComponentId    = 'ms_tcpip6'
             State          = 'Disabled'
@@ -433,20 +430,21 @@ configuration AKSHCIHost
         #### STAGE 2c - CONFIGURE InternaNAT NIC
 
         script NAT {
-            GetScript  = {
+            GetScript = {
                 $nat = "AKSHCINAT"
                 $result = if (Get-NetNat -Name $nat -ErrorAction SilentlyContinue) { $true } else { $false }
                 return @{ 'Result' = $result }
             }
         
-            SetScript  = {
+            SetScript = {
                 $nat = "AKSHCINAT"
                 New-NetNat -Name $nat -InternalIPInterfaceAddressPrefix "192.168.0.0/16"          
             }
         
             TestScript = {
-                # Create and invoke a scriptblock using the $GetScript automatic variable, which contains a string representation of the GetScript.
-                $state = [scriptblock]::Create($GetScript).Invoke()
+         
+
+                <#                $state = [scriptblock]::Create($GetScript).Invoke()
                 return $state.Result
             }
             DependsOn  = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
@@ -454,40 +452,41 @@ configuration AKSHCIHost
 
         NetAdapterBinding DisableIPv6NAT
         {
-            InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
-            ComponentId    = 'ms_tcpip6'
-            State          = 'Disabled'
-            DependsOn      = "[Script]NAT"
-        }
+#>
+                InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
+                ComponentId    = 'ms_tcpip6'
+                State          = 'Disabled'
+                DependsOn      = "[Script]NAT"
+            }
 
-        #### STAGE 2d - CONFIGURE DHCP SERVER
+            #### STAGE 2d - CONFIGURE DHCP SERVER
 
-        xDhcpServerScope "AksHciDhcpScope" { 
-            Ensure        = 'Present'
-            IPStartRange  = '192.168.0.3'
-            IPEndRange    = '192.168.0.149' 
-            ScopeId       = '192.168.0.0'
-            Name          = 'AKS-HCI Lab Range'
-            SubnetMask    = '255.255.0.0'
-            LeaseDuration = '01.00:00:00'
-            State         = "$dhcpStatus"
-            AddressFamily = 'IPv4'
-            DependsOn     = @("[WindowsFeature]Install DHCPServer", "[IPAddress]New IP for vEthernet $vSwitchNameHost")
-        }
+            xDhcpServerScope "AksHciDhcpScope" { 
+                Ensure = 'Present'
+                IPStartRange = '192.168.0.3'
+                IPEndRange = '192.168.0.149' 
+                ScopeId = '192.168.0.0'
+                Name = 'AKS-HCI Lab Range'
+                SubnetMask = '255.255.0.0'
+                LeaseDuration = '01.00:00:00'
+                State = "$dhcpStatus"
+                AddressFamily = 'IPv4'
+                DependsOn = @("[WindowsFeature]Install DHCPServer", "[IPAddress]New IP for vEthernet $vSwitchNameHost")
+            }
 
-        xDhcpServerOption "AksHciDhcpServerOption" { 
-            Ensure             = 'Present' 
-            ScopeID            = '192.168.0.0' 
-            DnsDomain          = "$DomainName"
-            DnsServerIPAddress = '192.168.0.1'
-            AddressFamily      = 'IPv4'
-            Router             = '192.168.0.1'
-            DependsOn          = "[xDhcpServerScope]AksHciDhcpScope"
-        }
+            xDhcpServerOption "AksHciDhcpServerOption" { 
+                Ensure = 'Present' 
+                ScopeID = '192.168.0.0' 
+                DnsDomain = "$DomainName"
+                DnsServerIPAddress = '192.168.0.1'
+                AddressFamily = 'IPv4'
+                Router = '192.168.0.1'
+                DependsOn = "[xDhcpServerScope]AksHciDhcpScope"
+            }
 
-        #### STAGE 2e - CONFIGURE DNS SERVER
+            #### STAGE 2e - CONFIGURE DNS SERVER
 
-        <#
+            <#
 
         xDnsServerPrimaryZone SetPrimaryDNSZone {
             Name          = "$DomainName"
@@ -514,22 +513,22 @@ configuration AKSHCIHost
         
         #>
 
-        #### STAGE 2f - FINALIZE DHCP
+            #### STAGE 2f - FINALIZE DHCP
 
-        Script SetDHCPDNSSetting {
-            SetScript  = { 
-                Set-DhcpServerv4DnsSetting -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True -UpdateDnsRRForOlderClients $True -DisableDnsPtrRRUpdate $false
-                Write-Verbose -Verbose "Setting server level DNS dynamic update configuration settings"
+            Script SetDHCPDNSSetting {
+                SetScript = { 
+                    Set-DhcpServerv4DnsSetting -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True -UpdateDnsRRForOlderClients $True -DisableDnsPtrRRUpdate $false
+                    Write-Verbose -Verbose "Setting server level DNS dynamic update configuration settings"
+                }
+                GetScript = { @{} 
+                }
+                TestScript = { $false }
+                DependsOn = "[xDhcpServerOption]AksHciDhcpServerOption"
             }
-            GetScript  = { @{} 
-            }
-            TestScript = { $false }
-            DependsOn  = "[xDhcpServerOption]AksHciDhcpServerOption"
-        }
 
-        #### STAGE 2g - CONFIGURE DNS CLIENT ON NICS
+            #### STAGE 2g - CONFIGURE DNS CLIENT ON NICS
 
-        <#
+            <#
         DnsServerAddress "DnsServerAddress for HostNic"
         { 
             Address        = '192.168.0.1'
@@ -593,6 +592,7 @@ configuration AKSHCIHost
         }
 
         #>
+        }
 
         #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
 
@@ -612,7 +612,7 @@ configuration AKSHCIHost
             DependsOn   = '[cChocoInstaller]installChoco'
         }
 
-        cChocoPackageInstaller "Install Chromium Edge" {
+        cChcoPackageInstaller "Install Chromium Edge" {
             Name        = 'microsoft-edge'
             Ensure      = 'Present'
             AutoUpgrade = $true
