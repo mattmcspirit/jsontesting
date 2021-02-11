@@ -177,6 +177,7 @@ configuration AKSHCIHost
             ValueType = "Dword"
         }
 
+        <#
         Registry "SetWorkgroupDomain" {
             Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
             Ensure    = 'Present'
@@ -214,6 +215,7 @@ configuration AKSHCIHost
             ValueType = "String"
             DependsOn = "[Registry]NewCredSSPKey2"
         }
+        #>
 
         ScheduledTask "Disable Server Manager at Startup"
         {
@@ -310,7 +312,7 @@ configuration AKSHCIHost
         WindowsFeature "Hyper-V" {
             Name      = "Hyper-V"
             Ensure    = "Present"
-            DependsOn = "[Registry]NewCredSSPKey3"
+            # DependsOn = "[Registry]NewCredSSPKey3"
         }
 
         WindowsFeature "RSAT-Hyper-V-Tools" {
@@ -499,6 +501,7 @@ configuration AKSHCIHost
         }
         #>
 
+        <#
         DnsConnectionSuffix AddSpecificSuffixHostNic
         {
             InterfaceAlias           = 'Ethernet'
@@ -512,6 +515,7 @@ configuration AKSHCIHost
             ConnectionSpecificSuffix = "$DomainName"
             DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
         }
+        
 
         #### STAGE 2h - CONFIGURE CREDSSP & WinRM
 
@@ -543,6 +547,8 @@ configuration AKSHCIHost
             }
             DependsOn  = "[xCredSSP]Client"
         }
+
+        #>
 
         #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
 
