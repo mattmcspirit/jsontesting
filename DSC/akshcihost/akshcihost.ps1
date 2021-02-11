@@ -171,58 +171,7 @@ configuration AKSHCIHost
             ValueName = ''
         }
 
-        <#
-
-        Registry "Set Network Private Profile Default" {
-            Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\CurrentVersion\NetworkList\Signatures\010103000F0000F0010000000F0000F0C967A3643C3AD745950DA7859209176EF5B87C875FA20DF21951640E807D7C24'
-            Ensure    = 'Present'
-            ValueName = "Category"
-            ValueData = "1"
-            ValueType = "Dword"
-        }
-
-        Registry "SetWorkgroupDomain" {
-            Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
-            Ensure    = 'Present'
-            ValueName = "Domain"
-            ValueData = "$DomainName"
-            ValueType = "String"
-        }
-
-        Registry "SetWorkgroupNVDomain" {
-            Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
-            Ensure    = 'Present'
-            ValueName = "NV Domain"
-            ValueData = "$DomainName"
-            ValueType = "String"
-        }
-
-        Registry "NewCredSSPKey" {
-            Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
-            Ensure    = 'Present'
-            ValueName = ''
-        }
-
-        Registry "NewCredSSPKey2" {
-            Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation'
-            ValueName = 'AllowFreshCredentialsWhenNTLMOnly'
-            ValueData = '1'
-            ValueType = "Dword"
-            DependsOn = "[Registry]NewCredSSPKey"
-        }
-
-        Registry "NewCredSSPKey3" {
-            Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
-            ValueName = '1'
-            ValueData = "*.$DomainName"
-            ValueType = "String"
-            DependsOn = "[Registry]NewCredSSPKey2"
-        }
-
-        #>
-
-        ScheduledTask "Disable Server Manager at Startup"
-        {
+        ScheduledTask "Disable Server Manager at Startup" {
             TaskName = 'ServerManager'
             Enable   = $false
             TaskPath = '\Microsoft\Windows\Server Manager'
@@ -239,8 +188,7 @@ configuration AKSHCIHost
                 ValueType = 'Dword'
             }
         
-            Firewall AddFirewallRule
-            {
+            Firewall AddFirewallRule {
                 Name        = 'CustomRdpRule'
                 DisplayName = 'Custom Rule for RDP'
                 Ensure      = 'Present'
@@ -311,9 +259,9 @@ configuration AKSHCIHost
             DomainName                    = $DomainName
             DomainAdministratorCredential = $DomainCreds
             SafemodeAdministratorPassword = $DomainCreds
-            DatabasePath                  = "$targetADPath\NTDS"
-            LogPath                       = "$targetADPath\NTDS"
-            SysvolPath                    = "$targetADPath\SYSVOL"
+            DatabasePath                  = "$targetADPath" + "\NTDS"
+            LogPath                       = "$targetADPath" + "\NTDS"
+            SysvolPath                    = "$targetADPath" + "\SYSVOL"
             DependsOn                     = @("[File]ADfolder", "[WindowsFeature]ADDSInstall")
         }
 
@@ -344,7 +292,6 @@ configuration AKSHCIHost
         WindowsFeature "Hyper-V" {
             Name   = "Hyper-V"
             Ensure = "Present"
-            # DependsOn = "[Registry]NewCredSSPKey3"
         }
 
         WindowsFeature "RSAT-Hyper-V-Tools" {
@@ -411,40 +358,30 @@ configuration AKSHCIHost
 
         #### STAGE 2b - PRIMARY NIC CONFIG ####
 
-        <tConnectionProfile SetProfile
-        {
-            InterfaceAlias  = 'Ethernet'
-            NetworkCategory = 'Private'
-        }
-        #>
-
         NetAdapterBinding DisableIPv6Host
         {
-            #>
             InterfaceAlias = 'Ethernet'
             ComponentId    = 'ms_tcpip6'
             State          = 'Disabled'
-            DependsOn      = "[NetConnectionProfile]SetProfile"
         }
 
         #### STAGE 2c - CONFIGURE InternaNAT NIC
 
         script NAT {
-            GetScript = {
+            GetScript  = {
                 $nat = "AKSHCINAT"
                 $result = if (Get-NetNat -Name $nat -ErrorAction SilentlyContinue) { $true } else { $false }
                 return @{ 'Result' = $result }
             }
         
-            SetScript = {
+            SetScript  = {
                 $nat = "AKSHCINAT"
                 New-NetNat -Name $nat -InternalIPInterfaceAddressPrefix "192.168.0.0/16"          
             }
         
             TestScript = {
-         
-
-                <#                $state = [scriptblock]::Create($GetScript).Invoke()
+                # Create and invoke a scriptblock using the $GetScript automatic variable, which contains a string representation of the GetScript.
+                $state = [scriptblock]::Create($GetScript).Invoke()
                 return $state.Result
             }
             DependsOn  = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
@@ -452,167 +389,68 @@ configuration AKSHCIHost
 
         NetAdapterBinding DisableIPv6NAT
         {
-#>
-                InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
-                ComponentId    = 'ms_tcpip6'
-                State          = 'Disabled'
-                DependsOn      = "[Script]NAT"
-            }
-
-            #### STAGE 2d - CONFIGURE DHCP SERVER
-
-            xDhcpServerScope "AksHciDhcpScope" { 
-                Ensure = 'Present'
-                IPStartRange = '192.168.0.3'
-                IPEndRange = '192.168.0.149' 
-                ScopeId = '192.168.0.0'
-                Name = 'AKS-HCI Lab Range'
-                SubnetMask = '255.255.0.0'
-                LeaseDuration = '01.00:00:00'
-                State = "$dhcpStatus"
-                AddressFamily = 'IPv4'
-                DependsOn = @("[WindowsFeature]Install DHCPServer", "[IPAddress]New IP for vEthernet $vSwitchNameHost")
-            }
-
-            xDhcpServerOption "AksHciDhcpServerOption" { 
-                Ensure = 'Present' 
-                ScopeID = '192.168.0.0' 
-                DnsDomain = "$DomainName"
-                DnsServerIPAddress = '192.168.0.1'
-                AddressFamily = 'IPv4'
-                Router = '192.168.0.1'
-                DependsOn = "[xDhcpServerScope]AksHciDhcpScope"
-            }
-
-            #### STAGE 2e - CONFIGURE DNS SERVER
-
-            <#
-
-        xDnsServerPrimaryZone SetPrimaryDNSZone {
-            Name          = "$DomainName"
-            Ensure        = 'Present'
-            DependsOn     = "[script]NAT"
-            ZoneFile      = "$DomainName" + ".dns"
-            DynamicUpdate = 'NonSecureAndSecure'
-        }
-
-        xDnsServerPrimaryZone SetReverseLookupZone {
-            Name          = '0.168.192.in-addr.arpa'
-            Ensure        = 'Present'
-            DependsOn     = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
-            ZoneFile      = '0.168.192.in-addr.arpa.dns'
-            DynamicUpdate = 'NonSecureAndSecure'
-        }
-
-        xDnsServerSetting SetListener {
-            Name            = 'AksHciListener'
-            ListenAddresses = '192.168.0.1'
-            Forwarders      = @('1.1.1.1', '1.0.0.1')
-            DependsOn       = "[xDnsServerPrimaryZone]SetReverseLookupZone"
-        }
-        
-        #>
-
-            #### STAGE 2f - FINALIZE DHCP
-
-            Script SetDHCPDNSSetting {
-                SetScript = { 
-                    Set-DhcpServerv4DnsSetting -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True -UpdateDnsRRForOlderClients $True -DisableDnsPtrRRUpdate $false
-                    Write-Verbose -Verbose "Setting server level DNS dynamic update configuration settings"
-                }
-                GetScript = { @{} 
-                }
-                TestScript = { $false }
-                DependsOn = "[xDhcpServerOption]AksHciDhcpServerOption"
-            }
-
-            #### STAGE 2g - CONFIGURE DNS CLIENT ON NICS
-
-            <#
-        DnsServerAddress "DnsServerAddress for HostNic"
-        { 
-            Address        = '192.168.0.1'
-            InterfaceAlias = "Ethernet"
-            AddressFamily  = 'IPv4'
-            DependsOn      = @("[WindowsFeature]DNS", "[Script]NAT", "[xDnsServerSetting]SetListener")
-        }
-
-        DnsServerAddress "DnsServerAddress for NATNic"
-        { 
-            Address        = '192.168.0.1'
             InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
-            AddressFamily  = 'IPv4'
-            DependsOn      = @("[WindowsFeature]DNS", "[IPAddress]New IP for vEthernet $vSwitchNameHost", "[xDnsServerSetting]SetListener")
-        }
-        
-
-        DnsConnectionSuffix AddSpecificSuffixHostNic
-        {
-            InterfaceAlias           = 'Ethernet'
-            ConnectionSpecificSuffix = "$DomainName"
-            DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
+            ComponentId    = 'ms_tcpip6'
+            State          = 'Disabled'
+            DependsOn      = "[Script]NAT"
         }
 
-        DnsConnectionSuffix AddSpecificSuffixNATNic
-        {
-            InterfaceAlias           = "vEthernet `($vSwitchNameHost`)"
-            ConnectionSpecificSuffix = "$DomainName"
-            DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
+        #### STAGE 2d - CONFIGURE DHCP SERVER
+
+        xDhcpServerScope "AksHciDhcpScope" { 
+            Ensure        = 'Present'
+            IPStartRange  = '192.168.0.3'
+            IPEndRange    = '192.168.0.149' 
+            ScopeId       = '192.168.0.0'
+            Name          = 'AKS-HCI Lab Range'
+            SubnetMask    = '255.255.0.0'
+            LeaseDuration = '01.00:00:00'
+            State         = "$dhcpStatus"
+            AddressFamily = 'IPv4'
+            DependsOn     = @("[WindowsFeature]Install DHCPServer", "[IPAddress]New IP for vEthernet $vSwitchNameHost")
         }
 
-        #### STAGE 2h - CONFIGURE CREDSSP & WinRM
-
-        xCredSSP Server {
-            Ensure         = "Present"
-            Role           = "Server"
-            DependsOn      = "[DnsConnectionSuffix]AddSpecificSuffixNATNic"
-            SuppressReboot = $true
-        }
-        xCredSSP Client {
-            Ensure            = "Present"
-            Role              = "Client"
-            DelegateComputers = "$env:COMPUTERNAME" + ".$DomainName"
-            DependsOn         = "[xCredSSP]Server"
-            SuppressReboot    = $true
+        xDhcpServerOption "AksHciDhcpServerOption" { 
+            Ensure             = 'Present' 
+            ScopeID            = '192.168.0.0' 
+            DnsDomain          = "$DomainName"
+            DnsServerIPAddress = '192.168.0.1'
+            AddressFamily      = 'IPv4'
+            Router             = '192.168.0.1'
+            DependsOn          = "[xDhcpServerScope]AksHciDhcpScope"
         }
 
-        #### STAGE 3a - CONFIGURE WinRM
+        #### STAGE 2f - FINALIZE DHCP
 
-        Script ConfigureWinRM {
-            SetScript  = {
-                Set-Item WSMan:\localhost\Client\TrustedHosts "*.$DomainName" -Force
+        Script SetDHCPDNSSetting {
+            SetScript  = { 
+                Set-DhcpServerv4DnsSetting -DynamicUpdates "Always" -DeleteDnsRRonLeaseExpiry $True -UpdateDnsRRForOlderClients $True -DisableDnsPtrRRUpdate $false
+                Write-Verbose -Verbose "Setting server level DNS dynamic update configuration settings"
             }
-            TestScript = {
-                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$DomainName"
+            GetScript  = { @{} 
             }
-            GetScript  = {
-                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$DomainName") { 'Present' } Else { 'Absent' } }
-            }
-            DependsOn  = "[xCredSSP]Client"
+            TestScript = { $false }
+            DependsOn  = "[xDhcpServerOption]AksHciDhcpServerOption"
         }
-
-        #>
-        }
-
         #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
 
         cChocoInstaller InstallChoco {
             InstallDir = "c:\choco"
         }
-    
+            
         cChocoFeature allowGlobalConfirmation {
             FeatureName = "allowGlobalConfirmation"
             Ensure      = 'Present'
             DependsOn   = '[cChocoInstaller]installChoco'
         }
-
+        
         cChocoFeature useRememberedArgumentsForUpgrades {
             FeatureName = "useRememberedArgumentsForUpgrades"
             Ensure      = 'Present'
             DependsOn   = '[cChocoInstaller]installChoco'
         }
-
-        cChcoPackageInstaller "Install Chromium Edge" {
+        
+        cChocoPackageInstaller "Install Chromium Edge" {
             Name        = 'microsoft-edge'
             Ensure      = 'Present'
             AutoUpgrade = $true
