@@ -85,6 +85,27 @@ configuration AKSHCIHost
             Params      = "'/Port:443'"
         }#>
 
+        PendingReboot "reboot"
+        {
+            Name = 'reboot'
+        }
+
+        Script "Fake reboot"
+        {
+            TestScript = {
+                return (Test-Path HKLM:\SOFTWARE\RebootKey)
+            }
+            SetScript = {
+                New-Item -Path HKLM:\SOFTWARE\RebootKey -Force
+                $global:DSCMachineStatus = 1 
+            }
+            GetScript = {
+                return @{result = 'result'}
+            }
+            DependsOn = "[cChocoPackageInstaller]Install WAC"
+        }
+
+        <#
         Script "Install WAC" {
             SetScript  = { 
                 Invoke-Command -ComputerName $env:computerName -Credential $Using:Admincreds -ScriptBlock { choco install windows-admin-center --params "'/Port:443'" }
@@ -94,6 +115,7 @@ configuration AKSHCIHost
             TestScript = { $false }
             DependsOn   = '[cChocoInstaller]InstallChoco'
         }
+        #>
 
         #### STAGE 1b - CREATE STORAGE SPACES V: & VM FOLDER ####
 
@@ -107,7 +129,7 @@ configuration AKSHCIHost
             GetScript  = {
                 @{Ensure = if ((Get-StoragePool -FriendlyName AksHciPool).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
             }
-            DependsOn  = "[Script]Install WAC"
+            DependsOn  = "[Script]Fake reboot"
         }
         Script VirtualDisk {
             SetScript  = {
@@ -247,13 +269,13 @@ configuration AKSHCIHost
         WindowsFeature DNS { 
             Ensure    = "Present" 
             Name      = "DNS"
-            DependsOn = "[Script]Install WAC"
+            DependsOn = "[Script]Fake reboot"
         }
 
         WindowsFeature "Enable Deduplication" { 
             Ensure    = "Present" 
             Name      = "FS-Data-Deduplication"
-            DependsOn = "[Script]Install WAC"	
+            DependsOn = "[Script]Fake reboot"	
         }
 
         Script EnableDNSDiags {
@@ -311,13 +333,13 @@ configuration AKSHCIHost
         WindowsFeature "RSAT-Clustering" {
             Name      = "RSAT-Clustering"
             Ensure    = "Present"
-            DependsOn = "[Script]Install WAC"
+            DependsOn = "[Script]Fake reboot"
         }
 
         WindowsFeature "Install DHCPServer" {
             Name      = 'DHCP'
             Ensure    = 'Present'
-            DependsOn = "[Script]Install WAC"
+            DependsOn = "[Script]Fake reboot"
         }
 
         WindowsFeature DHCPTools {
@@ -337,7 +359,7 @@ configuration AKSHCIHost
         WindowsFeature "Hyper-V" {
             Name      = "Hyper-V"
             Ensure    = "Present"
-            DependsOn = "[Script]Install WAC"
+            DependsOn = "[Script]Fake reboot"
         }
 
         WindowsFeature "RSAT-Hyper-V-Tools" {
