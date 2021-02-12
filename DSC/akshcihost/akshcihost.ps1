@@ -556,13 +556,13 @@ configuration AKSHCIHost
 
             Script ConfigureWinRM {
                 SetScript  = {
-                    Set-Item WSMan:\localhost\Client\TrustedHosts "*" -Force
+                    Set-Item WSMan:\localhost\Client\TrustedHosts "*.$Using:DomainName" -Force
                 }
                 TestScript = {
-                    (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*"
+                    (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$Using:DomainName"
                 }
                 GetScript  = {
-                    @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*") { 'Present' } Else { 'Absent' } }
+                    @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$Using:DomainName") { 'Present' } Else { 'Absent' } }
                 }
                 DependsOn  = "[xCredSSP]Client"
             }
