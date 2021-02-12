@@ -1,9 +1,8 @@
-param (
-    [Parameter(Mandatory)]
-    [string]$userName,
-    [string]$port = 443
-)
+$ProgressPreference = "SilentlyContinue"
 
-$downloadPath = "C:\Users\$UserName\Downloads\WindowsAdminCenter.msi"
-Invoke-WebRequest 'http://aka.ms/WACDownload' -OutFile $downloadPath
-msiexec /i $downloadPath /qn /L*v log.txt SME_PORT=$port SSL_CERTIFICATE_OPTION=generate
+## Download the MSI file
+Invoke-WebRequest -UseBasicParsing -Uri 'https://aka.ms/WACDownload' -OutFile "C:\WindowsAdminCenter.msi"
+
+## install Windows Admin Center
+$msiArgs = @("/i", "C:\WindowsAdminCenter.msi", "/qn", "/L*v", "log.txt", "SME_PORT=443", "SSL_CERTIFICATE_OPTION=generate")
+Start-Process msiexec.exe -Wait -ArgumentList $msiArgs
