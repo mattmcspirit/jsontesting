@@ -337,7 +337,6 @@ configuration AKSHCIHost
         }
 
         if ($environment -eq "AD Domain") {
-
             WindowsFeature "Hyper-V" {
                 Name   = "Hyper-V"
                 Ensure = "Present"
