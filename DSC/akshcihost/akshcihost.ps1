@@ -189,6 +189,7 @@ configuration AKSHCIHost
             ValueName = "IsInstalled"
             ValueData = "0"
             ValueType = "Dword"
+            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
 
         Registry "Disable Internet Explorer ESC for User" {
@@ -197,6 +198,7 @@ configuration AKSHCIHost
             ValueName = "IsInstalled"
             ValueData = "0"
             ValueType = "Dword"
+            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
 
         Registry "Add Wac to Intranet zone for SSO" {
@@ -205,6 +207,7 @@ configuration AKSHCIHost
             ValueName = "https"
             ValueData = "1"
             ValueType = 'Dword'
+            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
         
         Registry "Disable Server Manager WAC Prompt" {
@@ -213,18 +216,21 @@ configuration AKSHCIHost
             ValueName = "DoNotPopWACConsoleAtSMLaunch"
             ValueData = "1"
             ValueType = "Dword"
+            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
 
         Registry "Disable Network Profile Prompt" {
             Key       = 'HKLM:\System\CurrentControlSet\Control\Network\NewNetworkWindowOff'
             Ensure    = 'Present'
             ValueName = ''
+            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
 
         ScheduledTask "Disable Server Manager at Startup" {
             TaskName = 'ServerManager'
             Enable   = $false
             TaskPath = '\Microsoft\Windows\Server Manager'
+            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
 
         #### STAGE 1e - CUSTOM FIREWALL BASED ON ARM TEMPLATE ####
@@ -236,6 +242,7 @@ configuration AKSHCIHost
                 ValueName = "PortNumber"
                 ValueData = "$customRdpPort"
                 ValueType = 'Dword'
+                DependsOn  = @("[File]VMfolder", "[File]ADfolder")
             }
         
             Firewall AddFirewallRule {
@@ -248,6 +255,7 @@ configuration AKSHCIHost
                 LocalPort   = "$customRdpPort"
                 Protocol    = 'TCP'
                 Description = 'Firewall Rule for Custom RDP Port'
+                DependsOn  = @("[File]VMfolder", "[File]ADfolder")
             }
         }
     }
