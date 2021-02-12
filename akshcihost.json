@@ -300,8 +300,8 @@
     },
     "variables": {
         "dataDisksCount": 8,
-        "dscUri": "https://github.com/mattmcspirit/jsontesting/raw/DomainTest/DSC/akshcihost.zip",
-        "artifactsLocation": "https://raw.githubusercontent.com/mattmcspirit/jsontesting/DomainTest/",
+        "dscUri": "https://github.com/mattmcspirit/jsontesting/raw/main/DSC/akshcihost.zip",
+        "artifactsLocation": "https://raw.githubusercontent.com/mattmcspirit/jsontesting/main/",
         "randomGUID": "[substring(uniqueString(subscription().subscriptionId, resourceGroup().id, parameters('virtualMachineName')),0,6)]",
         "dnsNameForPublicIP": "[toLower(concat(parameters('virtualMachineName'), variables('randomGUID')))]",
         "virtualNetworkName": "AKSHCILabvNet",
