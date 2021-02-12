@@ -189,7 +189,6 @@ configuration AKSHCIHost
             ValueName = "IsInstalled"
             ValueData = "0"
             ValueType = "Dword"
-            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
 
         Registry "Disable Internet Explorer ESC for User" {
@@ -198,7 +197,6 @@ configuration AKSHCIHost
             ValueName = "IsInstalled"
             ValueData = "0"
             ValueType = "Dword"
-            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
 
         Registry "Add Wac to Intranet zone for SSO" {
@@ -207,9 +205,9 @@ configuration AKSHCIHost
             ValueName = "https"
             ValueData = "1"
             ValueType = 'Dword'
-            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
         
+        <#
         Registry "Disable Server Manager WAC Prompt" {
             Key       = "HKLM:\SOFTWARE\Microsoft\ServerManager"
             Ensure    = 'Present'
@@ -219,12 +217,14 @@ configuration AKSHCIHost
             DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
 
+        
         Registry "Disable Network Profile Prompt" {
             Key       = 'HKLM:\System\CurrentControlSet\Control\Network\NewNetworkWindowOff'
             Ensure    = 'Present'
             ValueName = ''
             DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
+        #>
 
         ScheduledTask "Disable Server Manager at Startup" {
             TaskName = 'ServerManager'
@@ -242,7 +242,6 @@ configuration AKSHCIHost
                 ValueName = "PortNumber"
                 ValueData = "$customRdpPort"
                 ValueType = 'Dword'
-                DependsOn  = @("[File]VMfolder", "[File]ADfolder")
             }
         
             Firewall AddFirewallRule {
@@ -255,7 +254,6 @@ configuration AKSHCIHost
                 LocalPort   = "$customRdpPort"
                 Protocol    = 'TCP'
                 Description = 'Firewall Rule for Custom RDP Port'
-                DependsOn  = @("[File]VMfolder", "[File]ADfolder")
             }
         }
     }
