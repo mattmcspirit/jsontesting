@@ -75,6 +75,17 @@
                 "description": "Select your VM generation, ideally Gen 2. Not all Azure regions support Gen 2 VMs."
             }
         },
+        "environment": {
+            "type": "string",
+            "defaultValue": "Workgroup",
+            "allowedValues": [
+                "Workgroup",
+                "AD Domain"
+            ],
+            "metadata": {
+                "description": "Choose to configure your environment in a Workgroup or Active Directory domain. Deployment time for Workgroup is around 13 minutes, and around 25 minutes for an Active Directory-based environment"
+            }
+        },
         "domainName": {
             "type": "string",
             "defaultValue": "akshci.local",
@@ -496,7 +507,7 @@
                         "autoUpgradeMinorVersion": true,
                         "settings": {
                             "fileUris": [
-                                "[uri(variables('artifactsLocation'), concat('/scripts/installWac.ps1'))]"
+                                "[uri(variables('artifactsLocation'), concat('scripts/installWac.ps1'))]"
                             ]
                         },
                         "protectedSettings": {
@@ -527,6 +538,7 @@
                             },
                             "configurationArguments": {
                                 "DomainName": "[parameters('domainName')]",
+                                "environment": "[parameters('environment')]",
                                 "enableDHCP": "[parameters('enableDHCP')]",
                                 "customRdpPort": "[parameters('customRdpPort')]"
                             }
