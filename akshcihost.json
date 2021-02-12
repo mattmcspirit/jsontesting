@@ -75,6 +75,13 @@
                 "description": "Select your VM generation, ideally Gen 2. Not all Azure regions support Gen 2 VMs."
             }
         },
+        "domainName": {
+            "type": "string",
+            "defaultValue": "akshci.local",
+            "metadata": {
+                "description": "The FQDN that will be used in the environment"
+            }
+        },
         "dataDiskType": {
             "type": "string",
             "defaultValue": "StandardSSD_LRS",
@@ -88,8 +95,9 @@
         },
         "dataDiskSize": {
             "type": "string",
-            "defaultValue": "64",
+            "defaultValue": "32",
             "allowedValues": [
+                "32",
                 "64",
                 "128",
                 "256",
@@ -292,13 +300,15 @@
     },
     "variables": {
         "dataDisksCount": 8,
-        "dscUri": "https://github.com/mattmcspirit/jsontesting/raw/main/DSC/akshcihost.zip",
+        "dscUri": "https://github.com/mattmcspirit/jsontesting/raw/DomainTest/DSC/akshcihost.zip",
+        "artifactsLocation": "https://raw.githubusercontent.com/mattmcspirit/jsontesting/DomainTest/",
         "randomGUID": "[substring(uniqueString(subscription().subscriptionId, resourceGroup().id, parameters('virtualMachineName')),0,6)]",
         "dnsNameForPublicIP": "[toLower(concat(parameters('virtualMachineName'), variables('randomGUID')))]",
         "virtualNetworkName": "AKSHCILabvNet",
         "networkInterfaceName": "AKSHCILabNIC1",
         "networkSecurityGroupName": "AKSHCILabNSG",
-        "addressPrefix": "10.0.0.0/24",
+        "addressPrefix": "10.0.0.0/16",
+        "privateIPAddress": "10.0.0.4",
         "subnetName": "AKSHCILabSubnet",
         "subnetPrefix": "10.0.0.0/24",
         "publicIpAddressName": "AKSHCILabPubIP",
@@ -308,6 +318,104 @@
         "subnetRef": "[concat(variables('vnetId'), '/subnets/', variables('subnetName'))]"
     },
     "resources": [
+        {
+            "name": "[variables('publicIpAddressName')]",
+            "type": "Microsoft.Network/publicIpAddresses",
+            "apiVersion": "2020-07-01",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "[variables('publicIpAddressSku')]"
+            },
+            "properties": {
+                "publicIpAllocationMethod": "[variables('publicIpAddressType')]",
+                "dnsSettings": {
+                    "domainNameLabel": "[variables('dnsNameForPublicIP')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2020-06-01",
+            "name": "[variables('virtualNetworkName')]",
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[uri(variables('artifactsLocation'), concat('json/vnet.json'))]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "virtualNetworkName": {
+                        "value": "[variables('virtualNetworkName')]"
+                    },
+                    "virtualNetworkAddressRange": {
+                        "value": "[variables('addressPrefix')]"
+                    },
+                    "subnetName": {
+                        "value": "[variables('subnetName')]"
+                    },
+                    "subnetRange": {
+                        "value": "[variables('subnetPrefix')]"
+                    },
+                    "location": {
+                        "value": "[resourceGroup().location]"
+                    }
+                }
+            }
+        },
+        {
+            "name": "[variables('networkInterfaceName')]",
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2020-05-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[variables('virtualNetworkName')]",
+                "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName'))]",
+                "[concat('Microsoft.Network/networkSecurityGroups/', variables('networkSecurityGroupName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "subnet": {
+                                "id": "[variables('subnetRef')]"
+                            },
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[variables('privateIPAddress')]",
+                            "publicIpAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName'))]"
+                            }
+                        }
+                    }
+                ],
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+                }
+            }
+        },
+        {
+            "name": "[variables('networkSecurityGroupName')]",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-05-01",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "rdp",
+                        "properties": {
+                            "priority": 1000,
+                            "protocol": "Tcp",
+                            "access": "Allow",
+                            "direction": "Inbound",
+                            "sourceAddressPrefix": "*",
+                            "sourcePortRange": "*",
+                            "destinationAddressPrefix": "*",
+                            "destinationPortRange": "[parameters('customRdpPort')]"
+                        }
+                    }
+                ]
+            }
+        },
         {
             "name": "[parameters('virtualMachineName')]",
             "type": "Microsoft.Compute/virtualMachines",
@@ -338,7 +446,7 @@
                     "osDisk": {
                         "createOption": "FromImage",
                         "managedDisk": {
-                            "storageAccountType": "StandardSSD_LRS"
+                            "storageAccountType": "Standard_LRS"
                         }
                     },
                     "copy": [
@@ -365,6 +473,11 @@
                         }
                     ]
                 },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                },
                 "licenseType": "[if(equals(parameters('alreadyHaveAWindowsServerLicense'), 'Yes'), 'Windows_Server', 'None')]"
             },
             "resources": [
@@ -389,12 +502,17 @@
                                 "function": "AKSHCIHost"
                             },
                             "configurationArguments": {
+                                "DomainName": "[parameters('domainName')]",
                                 "enableDHCP": "[parameters('enableDHCP')]",
                                 "customRdpPort": "[parameters('customRdpPort')]"
                             }
                         },
                         "protectedSettings": {
                             "configurationArguments": {
+                                "adminCreds": {
+                                    "UserName": "[parameters('adminUsername')]",
+                                    "Password": "[parameters('adminPassword')]"
+                                }
                             }
                         }
                     }
@@ -420,92 +538,40 @@
             ]
         },
         {
-            "name": "[variables('virtualNetworkName')]",
-            "type": "Microsoft.Network/virtualNetworks",
-            "apiVersion": "2020-07-01",
-            "location": "[resourceGroup().location]",
-            "properties": {
-                "addressSpace": {
-                    "addressPrefixes": [
-                        "[variables('addressPrefix')]"
-                    ]
-                },
-                "subnets": [
-                    {
-                        "name": "[variables('subnetName')]",
-                        "properties": {
-                            "addressPrefix": "[variables('subnetPrefix')]"
-                        }
-                    }
-                ]
-            }
-        },
-        {
-            "name": "[variables('networkInterfaceName')]",
-            "type": "Microsoft.Network/networkInterfaces",
-            "apiVersion": "2020-07-01",
-            "location": "[resourceGroup().location]",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2020-06-01",
+            "name": "[concat(variables('virtualNetworkName'),'-UpdateDNS')]",
             "dependsOn": [
-                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
-                "[concat('Microsoft.Network/publicIpAddresses/', variables('publicIpAddressName'))]",
-                "[concat('Microsoft.Network/networkSecurityGroups/', variables('networkSecurityGroupName'))]"
+                "[resourceId('Microsoft.Compute/virtualMachines/extensions', parameters('virtualMachineName'), 'ConfigureAksHciHost')]"
             ],
             "properties": {
-                "ipConfigurations": [
-                    {
-                        "name": "ipconfig1",
-                        "properties": {
-                            "subnet": {
-                                "id": "[variables('subnetRef')]"
-                            },
-                            "privateIPAllocationMethod": "Dynamic",
-                            "publicIpAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIpAddresses', variables('publicIpAddressName'))]"
-                            }
-                        }
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[uri(variables('artifactsLocation'), concat('json/updatevnet.json'))]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "virtualNetworkName": {
+                        "value": "[variables('virtualNetworkName')]"
+                    },
+                    "virtualNetworkAddressRange": {
+                        "value": "[variables('addressPrefix')]"
+                    },
+                    "subnetName": {
+                        "value": "[variables('subnetName')]"
+                    },
+                    "subnetRange": {
+                        "value": "[variables('subnetPrefix')]"
+                    },
+                    "DNSServerAddress": {
+                        "value": [
+                            "[variables('privateIPAddress')]"
+                        ]
+                    },
+                    "location": {
+                        "value": "[resourceGroup().location]"
                     }
-                ],
-                "networkSecurityGroup": {
-                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
                 }
-            }
-        },
-        {
-            "name": "[variables('publicIpAddressName')]",
-            "type": "Microsoft.Network/publicIpAddresses",
-            "apiVersion": "2020-07-01",
-            "location": "[resourceGroup().location]",
-            "sku": {
-                "name": "[variables('publicIpAddressSku')]"
-            },
-            "properties": {
-                "publicIpAllocationMethod": "[variables('publicIpAddressType')]",
-                "dnsSettings": {
-                    "domainNameLabel": "[variables('dnsNameForPublicIP')]"
-                }
-            }
-        },
-        {
-            "name": "[variables('networkSecurityGroupName')]",
-            "type": "Microsoft.Network/networkSecurityGroups",
-            "apiVersion": "2020-07-01",
-            "location": "[resourceGroup().location]",
-            "properties": {
-                "securityRules": [
-                    {
-                        "name": "rdp",
-                        "properties": {
-                            "priority": 1000,
-                            "protocol": "Tcp",
-                            "access": "Allow",
-                            "direction": "Inbound",
-                            "sourceAddressPrefix": "*",
-                            "sourcePortRange": "*",
-                            "destinationAddressPrefix": "*",
-                            "destinationPortRange": "[parameters('customRdpPort')]"
-                        }
-                    }
-                ]
             }
         }
     ],

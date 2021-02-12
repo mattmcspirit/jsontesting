@@ -15,6 +15,7 @@ configuration AKSHCIHost
         [string]$vSwitchNameHost = "InternalNAT",
         [String]$targetDrive = "V",
         [String]$targetVMPath = "$targetDrive" + ":\VMs",
+        #[String]$targetADPath = "$targetDrive" + ":\ADDS",
         [String]$baseVHDFolderPath = "$targetVMPath\base"
     ) 
     
@@ -104,6 +105,11 @@ configuration AKSHCIHost
             DestinationPath = $targetVMPath
             DependsOn       = "[Script]FormatDisk"
         }
+        <# File "ADfolder" {
+            Type            = 'Directory'
+            DestinationPath = $targetADPath
+            DependsOn       = "[Script]FormatDisk"
+        } #>
 
         #### STAGE 1b - SET WINDOWS DEFENDER EXCLUSION FOR VM STORAGE ####
 
@@ -171,6 +177,7 @@ configuration AKSHCIHost
             ValueType = "Dword"
         }
 
+        <#
         Registry "SetWorkgroupDomain" {
             Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
             Ensure    = 'Present'
@@ -186,6 +193,8 @@ configuration AKSHCIHost
             ValueData = "$DomainName"
             ValueType = "String"
         }
+
+        #>
 
         Registry "NewCredSSPKey" {
             Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
@@ -204,7 +213,7 @@ configuration AKSHCIHost
         Registry "NewCredSSPKey3" {
             Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
             ValueName = '1'
-            ValueData = "*.$DomainName"
+            ValueData = "*"
             ValueType = "String"
             DependsOn = "[Registry]NewCredSSPKey2"
         }
@@ -493,6 +502,7 @@ configuration AKSHCIHost
         }
         #>
 
+        <#
         DnsConnectionSuffix AddSpecificSuffixHostNic
         {
             InterfaceAlias           = 'Ethernet'
@@ -506,37 +516,41 @@ configuration AKSHCIHost
             ConnectionSpecificSuffix = "$DomainName"
             DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
         }
+        
+        #>
 
         #### STAGE 2h - CONFIGURE CREDSSP & WinRM
 
         xCredSSP Server {
             Ensure         = "Present"
             Role           = "Server"
-            DependsOn      = "[DnsConnectionSuffix]AddSpecificSuffixNATNic"
+            DependsOn      = "[xDnsServerPrimaryZone]SetReverseLookupZone"
             SuppressReboot = $true
         }
         xCredSSP Client {
-            Ensure            = "Present"
-            Role              = "Client"
-            DelegateComputers = "$env:COMPUTERNAME" + ".$DomainName"
-            DependsOn         = "[xCredSSP]Server"
-            SuppressReboot    = $true
+            Ensure         = "Present"
+            Role           = "Client"
+            DelegateComputers = "$env:COMPUTERNAME"
+            DependsOn      = "[xCredSSP]Server"
+            SuppressReboot = $true
         }
 
         #### STAGE 3a - CONFIGURE WinRM
 
         Script ConfigureWinRM {
             SetScript  = {
-                Set-Item WSMan:\localhost\Client\TrustedHosts "*.$DomainName" -Force
+                Set-Item WSMan:\localhost\Client\TrustedHosts "*" -Force
             }
             TestScript = {
-                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$DomainName"
+                (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*"
             }
             GetScript  = {
-                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$DomainName") { 'Present' } Else { 'Absent' } }
+                @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*") { 'Present' } Else { 'Absent' } }
             }
             DependsOn  = "[xCredSSP]Client"
         }
+
+        #>
 
         #### STAGE 3b - INSTALL CHOCO & DEPLOY EDGE
 
