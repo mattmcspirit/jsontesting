@@ -180,5 +180,75 @@ configuration AKSHCIHost
             }
             DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
+        
+        #### STAGE 1d - REGISTRY & SCHEDULED TASK TWEAKS ####
+
+        Registry "Disable Internet Explorer ESC for Admin" {
+            Key       = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"
+            Ensure    = 'Present'
+            ValueName = "IsInstalled"
+            ValueData = "0"
+            ValueType = "Dword"
+        }
+
+        Registry "Disable Internet Explorer ESC for User" {
+            Key       = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A8-37EF-4b3f-8CFC-4F3A74704073}"
+            Ensure    = 'Present'
+            ValueName = "IsInstalled"
+            ValueData = "0"
+            ValueType = "Dword"
+        }
+
+        Registry "Add Wac to Intranet zone for SSO" {
+            Key       = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\EscDomains\wac'
+            Ensure    = 'Present'
+            ValueName = "https"
+            ValueData = "1"
+            ValueType = 'Dword'
+        }
+        
+        Registry "Disable Server Manager WAC Prompt" {
+            Key       = "HKLM:\SOFTWARE\Microsoft\ServerManager"
+            Ensure    = 'Present'
+            ValueName = "DoNotPopWACConsoleAtSMLaunch"
+            ValueData = "1"
+            ValueType = "Dword"
+        }
+
+        Registry "Disable Network Profile Prompt" {
+            Key       = 'HKLM:\System\CurrentControlSet\Control\Network\NewNetworkWindowOff'
+            Ensure    = 'Present'
+            ValueName = ''
+        }
+
+        ScheduledTask "Disable Server Manager at Startup" {
+            TaskName = 'ServerManager'
+            Enable   = $false
+            TaskPath = '\Microsoft\Windows\Server Manager'
+        }
+
+        #### STAGE 1e - CUSTOM FIREWALL BASED ON ARM TEMPLATE ####
+
+        if ($customRdpPort -ne "3389") {
+
+            Registry "Set Custom RDP Port" {
+                Key       = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp'
+                ValueName = "PortNumber"
+                ValueData = "$customRdpPort"
+                ValueType = 'Dword'
+            }
+        
+            Firewall AddFirewallRule {
+                Name        = 'CustomRdpRule'
+                DisplayName = 'Custom Rule for RDP'
+                Ensure      = 'Present'
+                Enabled     = 'True'
+                Profile     = 'Any'
+                Direction   = 'Inbound'
+                LocalPort   = "$customRdpPort"
+                Protocol    = 'TCP'
+                Description = 'Firewall Rule for Custom RDP Port'
+            }
+        }
     }
 }
