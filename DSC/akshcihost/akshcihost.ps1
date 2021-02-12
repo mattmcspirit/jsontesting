@@ -103,5 +103,82 @@ configuration AKSHCIHost
             }
             DependsOn = "[cChocoPackageInstaller]Install WAC"
         }
+
+        #### STAGE 1b - CREATE STORAGE SPACES V: & VM FOLDER ####
+
+        Script StoragePool {
+            SetScript  = {
+                New-StoragePool -FriendlyName AksHciPool -StorageSubSystemFriendlyName '*storage*' -PhysicalDisks (Get-PhysicalDisk -CanPool $true)
+            }
+            TestScript = {
+                (Get-StoragePool -ErrorAction SilentlyContinue -FriendlyName AksHciPool).OperationalStatus -eq 'OK'
+            }
+            GetScript  = {
+                @{Ensure = if ((Get-StoragePool -FriendlyName AksHciPool).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
+            }
+            DependsOn  = "[Script]Fake reboot"
+        }
+        Script VirtualDisk {
+            SetScript  = {
+                $disks = Get-StoragePool -FriendlyName AksHciPool -IsPrimordial $False | Get-PhysicalDisk
+                $diskNum = $disks.Count
+                New-VirtualDisk -StoragePoolFriendlyName AksHciPool -FriendlyName AksHciDisk -ResiliencySettingName Simple -NumberOfColumns $diskNum -UseMaximumSize
+            }
+            TestScript = {
+                (Get-VirtualDisk -ErrorAction SilentlyContinue -FriendlyName AksHciDisk).OperationalStatus -eq 'OK'
+            }
+            GetScript  = {
+                @{Ensure = if ((Get-VirtualDisk -FriendlyName AksHciDisk).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
+            }
+            DependsOn  = "[Script]StoragePool"
+        }
+        Script FormatDisk {
+            SetScript  = {
+                $vDisk = Get-VirtualDisk -FriendlyName AksHciDisk
+                if ($vDisk | Get-Disk | Where-Object PartitionStyle -eq 'raw') {
+                    $vDisk | Get-Disk | Initialize-Disk -Passthru | New-Partition -DriveLetter $Using:targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
+                }
+                elseif ($vDisk | Get-Disk | Where-Object PartitionStyle -eq 'GPT') {
+                    $vDisk | Get-Disk | New-Partition -DriveLetter $Using:targetDrive -UseMaximumSize | Format-Volume -NewFileSystemLabel AksHciData -AllocationUnitSize 64KB -FileSystem NTFS
+                }
+            }
+            TestScript = { 
+                (Get-Volume -ErrorAction SilentlyContinue -FileSystemLabel AksHciData).FileSystem -eq 'NTFS'
+            }
+            GetScript  = {
+                @{Ensure = if ((Get-Volume -FileSystemLabel AksHciData).FileSystem -eq 'NTFS') { 'Present' } Else { 'Absent' } }
+            }
+            DependsOn  = "[Script]VirtualDisk"
+        }
+
+        File "VMfolder" {
+            Type            = 'Directory'
+            DestinationPath = $targetVMPath
+            DependsOn       = "[Script]FormatDisk"
+        }
+        
+        File "ADfolder" {
+            Type            = 'Directory'
+            DestinationPath = $targetADPath
+            DependsOn       = "[Script]FormatDisk"
+        }
+
+        #### STAGE 1c - SET WINDOWS DEFENDER EXCLUSION FOR VM STORAGE ####
+
+        Script defenderExclusions {
+            SetScript  = {
+                $exclusionPath = "$Using:targetDrive" + ":\"
+                Add-MpPreference -ExclusionPath "$exclusionPath"               
+            }
+            TestScript = {
+                $exclusionPath = "$Using:targetDrive" + ":\"
+                (Get-MpPreference).ExclusionPath -contains "$exclusionPath"
+            }
+            GetScript  = {
+                $exclusionPath = "$Using:targetDrive" + ":\"
+                @{Ensure = if ((Get-MpPreference).ExclusionPath -contains "$exclusionPath") { 'Present' } Else { 'Absent' } }
+            }
+            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
+        }
     }
 }
