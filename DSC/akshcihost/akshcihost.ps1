@@ -230,7 +230,6 @@ configuration AKSHCIHost
             TaskName = 'ServerManager'
             Enable   = $false
             TaskPath = '\Microsoft\Windows\Server Manager'
-            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
 
         #### STAGE 1e - CUSTOM FIREWALL BASED ON ARM TEMPLATE ####
