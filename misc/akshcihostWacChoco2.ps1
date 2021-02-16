@@ -5,8 +5,6 @@ configuration AKSHCIHost
         [Parameter(Mandatory)]
         [string]$DomainName,
         [Parameter(Mandatory)]
-        [string]$environment,
-        [Parameter(Mandatory)]
         [System.Management.Automation.PSCredential]$Admincreds,
         [Parameter(Mandatory)]
         [string]$enableDHCP,
@@ -53,11 +51,60 @@ configuration AKSHCIHost
             ConfigurationMode  = 'ApplyOnly'
         }
 
-        # STAGE 1 -> PRE-HYPER-V REBOOT
-        # STAGE 2 -> POST-HYPER-V REBOOT
-        # STAGE 3 -> POST CREDSSP REBOOT
+        #### STAGE 1a - INSTALL CHOCO & DEPLOY EDGE
 
-        #### STAGE 1a - CREATE STORAGE SPACES V: & VM FOLDER ####
+        cChocoInstaller InstallChoco {
+            InstallDir = "c:\choco"
+        }
+                    
+        cChocoFeature allowGlobalConfirmation {
+            FeatureName = "allowGlobalConfirmation"
+            Ensure      = 'Present'
+            DependsOn   = '[cChocoInstaller]InstallChoco'
+        }
+                
+        cChocoFeature useRememberedArgumentsForUpgrades {
+            FeatureName = "useRememberedArgumentsForUpgrades"
+            Ensure      = 'Present'
+            DependsOn   = '[cChocoInstaller]InstallChoco'
+        }
+                
+        cChocoPackageInstaller "Install Chromium Edge" {
+            Name        = 'microsoft-edge'
+            Ensure      = 'Present'
+            AutoUpgrade = $true
+            DependsOn   = '[cChocoInstaller]InstallChoco'
+        }
+        
+        cChocoPackageInstaller "Install WAC" {
+            Name        = 'windows-admin-center'
+            Ensure      = 'Present'
+            AutoUpgrade = $true
+            DependsOn   = '[cChocoInstaller]InstallChoco'
+            Params      = "'/Port:443'"
+        }
+
+        PendingReboot "reboot"
+        {
+            Name = 'reboot'
+        }
+
+        Script "Fake reboot"
+        {
+            TestScript = {
+                return (Test-Path HKLM:\SOFTWARE\RebootKey)
+            }
+            SetScript = {
+                New-Item -Path HKLM:\SOFTWARE\RebootKey -Force
+                $global:DSCMachineStatus = 1 
+            }
+            GetScript = {
+                return @{result = 'result'}
+            }
+            DependsOn = "[cChocoPackageInstaller]Install WAC"
+        }
+
+        #### STAGE 1b - CREATE STORAGE SPACES V: & VM FOLDER ####
 
         Script StoragePool {
             SetScript  = {
@@ -69,6 +116,7 @@ configuration AKSHCIHost
             GetScript  = {
                 @{Ensure = if ((Get-StoragePool -FriendlyName AksHciPool).OperationalStatus -eq 'OK') { 'Present' } Else { 'Absent' } }
             }
+            DependsOn  = "[Script]Fake reboot"
         }
         Script VirtualDisk {
             SetScript  = {
@@ -108,16 +156,14 @@ configuration AKSHCIHost
             DestinationPath = $targetVMPath
             DependsOn       = "[Script]FormatDisk"
         }
-
-        if ($environment -eq "AD Domain") {
-            File "ADfolder" {
-                Type            = 'Directory'
-                DestinationPath = $targetADPath
-                DependsOn       = "[Script]FormatDisk"
-            }
+        
+        File "ADfolder" {
+            Type            = 'Directory'
+            DestinationPath = $targetADPath
+            DependsOn       = "[Script]FormatDisk"
         }
 
-        #### STAGE 1b - SET WINDOWS DEFENDER EXCLUSION FOR VM STORAGE ####
+        #### STAGE 1c - SET WINDOWS DEFENDER EXCLUSION FOR VM STORAGE ####
 
         Script defenderExclusions {
             SetScript  = {
@@ -132,10 +178,10 @@ configuration AKSHCIHost
                 $exclusionPath = "$Using:targetDrive" + ":\"
                 @{Ensure = if ((Get-MpPreference).ExclusionPath -contains "$exclusionPath") { 'Present' } Else { 'Absent' } }
             }
-            DependsOn  = "[File]VMfolder"
+            DependsOn  = @("[File]VMfolder", "[File]ADfolder")
         }
 
-        #### STAGE 1c - REGISTRY & SCHEDULED TASK TWEAKS ####
+        #### STAGE 1d - REGISTRY & SCHEDULED TASK TWEAKS ####
 
         Registry "Disable Internet Explorer ESC for Admin" {
             Key       = "HKLM:\SOFTWARE\Microsoft\Active Setup\Installed Components\{A509B1A7-37EF-4b3f-8CFC-4F3A74704073}"
@@ -152,6 +198,14 @@ configuration AKSHCIHost
             ValueData = "0"
             ValueType = "Dword"
         }
+
+        Registry "Add Wac to Intranet zone for SSO" {
+            Key       = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ZoneMap\EscDomains\wac'
+            Ensure    = 'Present'
+            ValueName = "https"
+            ValueData = "1"
+            ValueType = 'Dword'
+        }
         
         Registry "Disable Server Manager WAC Prompt" {
             Key       = "HKLM:\SOFTWARE\Microsoft\ServerManager"
@@ -167,61 +221,13 @@ configuration AKSHCIHost
             ValueName = ''
         }
 
-        if ($environment -eq "Workgroup") {
-            Registry "Set Network Private Profile Default" {
-                Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\CurrentVersion\NetworkList\Signatures\010103000F0000F0010000000F0000F0C967A3643C3AD745950DA7859209176EF5B87C875FA20DF21951640E807D7C24'
-                Ensure    = 'Present'
-                ValueName = "Category"
-                ValueData = "1"
-                ValueType = "Dword"
-            }
-    
-            Registry "SetWorkgroupDomain" {
-                Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
-                Ensure    = 'Present'
-                ValueName = "Domain"
-                ValueData = "$DomainName"
-                ValueType = "String"
-            }
-    
-            Registry "SetWorkgroupNVDomain" {
-                Key       = "HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
-                Ensure    = 'Present'
-                ValueName = "NV Domain"
-                ValueData = "$DomainName"
-                ValueType = "String"
-            }
-    
-            Registry "NewCredSSPKey" {
-                Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
-                Ensure    = 'Present'
-                ValueName = ''
-            }
-    
-            Registry "NewCredSSPKey2" {
-                Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation'
-                ValueName = 'AllowFreshCredentialsWhenNTLMOnly'
-                ValueData = '1'
-                ValueType = "Dword"
-                DependsOn = "[Registry]NewCredSSPKey"
-            }
-    
-            Registry "NewCredSSPKey3" {
-                Key       = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\CredentialsDelegation\AllowFreshCredentialsWhenNTLMOnly'
-                ValueName = '1'
-                ValueData = "*.$DomainName"
-                ValueType = "String"
-                DependsOn = "[Registry]NewCredSSPKey2"
-            }
-        }
-
         ScheduledTask "Disable Server Manager at Startup" {
             TaskName = 'ServerManager'
             Enable   = $false
             TaskPath = '\Microsoft\Windows\Server Manager'
         }
 
-        #### STAGE 1d - CUSTOM FIREWALL BASED ON ARM TEMPLATE ####
+        #### STAGE 1e - CUSTOM FIREWALL BASED ON ARM TEMPLATE ####
 
         if ($customRdpPort -ne "3389") {
 
@@ -245,16 +251,18 @@ configuration AKSHCIHost
             }
         }
 
-        #### STAGE 1e - ENABLE ROLES & FEATURES ####
+        #### STAGE 1f - ENABLE ROLES & FEATURES ####
 
         WindowsFeature DNS { 
-            Ensure = "Present" 
-            Name   = "DNS"		
+            Ensure    = "Present" 
+            Name      = "DNS"
+            DependsOn = "[Script]Fake reboot"
         }
 
         WindowsFeature "Enable Deduplication" { 
-            Ensure = "Present" 
-            Name   = "FS-Data-Deduplication"		
+            Ensure    = "Present" 
+            Name      = "FS-Data-Deduplication"
+            DependsOn = "[Script]Fake reboot"	
         }
 
         Script EnableDNSDiags {
@@ -281,45 +289,44 @@ configuration AKSHCIHost
             DependsOn      = "[WindowsFeature]DNS"
         }
 
-        if ($environment -eq "AD Domain") {
+        WindowsFeature ADDSInstall { 
+            Ensure    = "Present" 
+            Name      = "AD-Domain-Services"
+            DependsOn = @("[WindowsFeature]DNS")
+        }
 
-            WindowsFeature ADDSInstall { 
-                Ensure    = "Present" 
-                Name      = "AD-Domain-Services"
-                DependsOn = "[WindowsFeature]DNS" 
-            } 
+        WindowsFeature ADDSTools {
+            Ensure    = "Present"
+            Name      = "RSAT-ADDS-Tools"
+            DependsOn = "[WindowsFeature]ADDSInstall"
+        }
 
-            WindowsFeature ADDSTools {
-                Ensure    = "Present"
-                Name      = "RSAT-ADDS-Tools"
-                DependsOn = "[WindowsFeature]ADDSInstall"
-            }
-
-            WindowsFeature ADAdminCenter {
-                Ensure    = "Present"
-                Name      = "RSAT-AD-AdminCenter"
-                DependsOn = "[WindowsFeature]ADDSInstall"
-            }
+        WindowsFeature ADAdminCenter {
+            Ensure    = "Present"
+            Name      = "RSAT-AD-AdminCenter"
+            DependsOn = "[WindowsFeature]ADDSInstall"
+        }
          
-            xADDomain FirstDS {
-                DomainName                    = $DomainName
-                DomainAdministratorCredential = $DomainCreds
-                SafemodeAdministratorPassword = $DomainCreds
-                DatabasePath                  = "$targetADPath" + "\NTDS"
-                LogPath                       = "$targetADPath" + "\NTDS"
-                SysvolPath                    = "$targetADPath" + "\SYSVOL"
-                DependsOn                     = @("[File]ADfolder", "[WindowsFeature]ADDSInstall")
-            }
+        xADDomain FirstDS {
+            DomainName                    = $DomainName
+            DomainAdministratorCredential = $DomainCreds
+            SafemodeAdministratorPassword = $DomainCreds
+            DatabasePath                  = "$targetADPath" + "\NTDS"
+            LogPath                       = "$targetADPath" + "\NTDS"
+            SysvolPath                    = "$targetADPath" + "\SYSVOL"
+            DependsOn                     = @("[File]ADfolder", "[WindowsFeature]ADDSInstall")
         }
 
         WindowsFeature "RSAT-Clustering" {
-            Name   = "RSAT-Clustering"
-            Ensure = "Present"
+            Name      = "RSAT-Clustering"
+            Ensure    = "Present"
+            DependsOn = "[Script]Fake reboot"
         }
 
         WindowsFeature "Install DHCPServer" {
-            Name   = 'DHCP'
-            Ensure = 'Present'
+            Name      = 'DHCP'
+            Ensure    = 'Present'
+            DependsOn = "[Script]Fake reboot"
         }
 
         WindowsFeature DHCPTools {
@@ -336,18 +343,10 @@ configuration AKSHCIHost
             DependsOn = "[WindowsFeature]DHCPTools"
         }
 
-        if ($environment -eq "AD Domain") {
-            WindowsFeature "Hyper-V" {
-                Name   = "Hyper-V"
-                Ensure = "Present"
-            }
-        }
-        else {
-            WindowsFeature "Hyper-V" {
-                Name      = "Hyper-V"
-                Ensure    = "Present"
-                DependsOn = "[Registry]NewCredSSPKey3"
-            }
+        WindowsFeature "Hyper-V" {
+            Name      = "Hyper-V"
+            Ensure    = "Present"
+            DependsOn = "[Script]Fake reboot"
         }
 
         WindowsFeature "RSAT-Hyper-V-Tools" {
@@ -405,34 +404,14 @@ configuration AKSHCIHost
             DependsOn      = "[IPAddress]New IP for vEthernet $vSwitchNameHost"
         }
 
-        if ($environment -eq "AD Domain") {
-
-            xDhcpServerAuthorization "Authorize DHCP" {
-                Ensure    = 'Present'
-                DependsOn = @('[WindowsFeature]Install DHCPServer')
-                DnsName   = [System.Net.Dns]::GetHostByName($env:computerName).hostname
-                IPAddress = '192.168.0.1'
-            }
+        xDhcpServerAuthorization "Authorize DHCP" {
+            Ensure    = 'Present'
+            DependsOn = @('[WindowsFeature]Install DHCPServer')
+            DnsName   = [System.Net.Dns]::GetHostByName($env:computerName).hostname
+            IPAddress = '192.168.0.1'
         }
 
-        if ($environment -eq "Workgroup") {
-            NetConnectionProfile SetProfile
-            {
-                InterfaceAlias  = 'Ethernet'
-                NetworkCategory = 'Private'
-            }
-        }
-
-        #### STAGE 2b - PRIMARY NIC CONFIG ####
-
-        NetAdapterBinding DisableIPv6Host
-        {
-            InterfaceAlias = 'Ethernet'
-            ComponentId    = 'ms_tcpip6'
-            State          = 'Disabled'
-        }
-
-        #### STAGE 2c - CONFIGURE InternaNAT NIC
+        #### STAGE 2b - CONFIGURE InternaNAT NIC
 
         script NAT {
             GetScript  = {
@@ -457,6 +436,16 @@ configuration AKSHCIHost
         NetAdapterBinding DisableIPv6NAT
         {
             InterfaceAlias = "vEthernet `($vSwitchNameHost`)"
+            ComponentId    = 'ms_tcpip6'
+            State          = 'Disabled'
+            DependsOn      = "[Script]NAT"
+        }
+
+        #### STAGE 2c - PRIMARY NIC CONFIG ####
+
+        NetAdapterBinding DisableIPv6Host
+        {
+            InterfaceAlias = 'Ethernet'
             ComponentId    = 'ms_tcpip6'
             State          = 'Disabled'
             DependsOn      = "[Script]NAT"
@@ -487,26 +476,7 @@ configuration AKSHCIHost
             DependsOn          = "[xDhcpServerScope]AksHciDhcpScope"
         }
 
-        if ($environment -eq "Workgroup") {
-
-            xDnsServerPrimaryZone SetPrimaryDNSZone {
-                Name          = "$DomainName"
-                Ensure        = 'Present'
-                DependsOn     = "[script]NAT"
-                ZoneFile      = "$DomainName" + ".dns"
-                DynamicUpdate = 'NonSecureAndSecure'
-            }
-    
-            xDnsServerPrimaryZone SetReverseLookupZone {
-                Name          = '0.168.192.in-addr.arpa'
-                Ensure        = 'Present'
-                DependsOn     = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
-                ZoneFile      = '0.168.192.in-addr.arpa.dns'
-                DynamicUpdate = 'NonSecureAndSecure'
-            }
-        }
-
-        #### STAGE 2f - FINALIZE DHCP
+        #### STAGE 2e - FINALIZE DHCP
 
         Script SetDHCPDNSSetting {
             SetScript  = { 
@@ -517,113 +487,6 @@ configuration AKSHCIHost
             }
             TestScript = { $false }
             DependsOn  = "[xDhcpServerOption]AksHciDhcpServerOption"
-        }
-
-        if ($environment -eq "Workgroup") {
-
-            DnsConnectionSuffix AddSpecificSuffixHostNic
-            {
-                InterfaceAlias           = 'Ethernet'
-                ConnectionSpecificSuffix = "$DomainName"
-                DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
-            }
-    
-            DnsConnectionSuffix AddSpecificSuffixNATNic
-            {
-                InterfaceAlias           = "vEthernet `($vSwitchNameHost`)"
-                ConnectionSpecificSuffix = "$DomainName"
-                DependsOn                = "[xDnsServerPrimaryZone]SetPrimaryDNSZone"
-            }
-
-            #### STAGE 2h - CONFIGURE CREDSSP & WinRM
-
-            xCredSSP Server {
-                Ensure         = "Present"
-                Role           = "Server"
-                DependsOn      = "[DnsConnectionSuffix]AddSpecificSuffixNATNic"
-                SuppressReboot = $true
-            }
-            xCredSSP Client {
-                Ensure            = "Present"
-                Role              = "Client"
-                DelegateComputers = "$env:COMPUTERNAME" + ".$DomainName"
-                DependsOn         = "[xCredSSP]Server"
-                SuppressReboot    = $true
-            }
-
-            #### STAGE 3a - CONFIGURE WinRM
-
-            Script ConfigureWinRM {
-                SetScript  = {
-                    Set-Item WSMan:\localhost\Client\TrustedHosts "*.$Using:DomainName" -Force
-                }
-                TestScript = {
-                    (Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$Using:DomainName"
-                }
-                GetScript  = {
-                    @{Ensure = if ((Get-Item WSMan:\localhost\Client\TrustedHosts).Value -contains "*.$Using:DomainName") { 'Present' } Else { 'Absent' } }
-                }
-                DependsOn  = "[xCredSSP]Client"
-            }
-        }
-
-        #### STAGE 3b - INSTALL CHOCO, DEPLOY EDGE and Shortcuts
-
-        cChocoInstaller InstallChoco {
-            InstallDir = "c:\choco"
-        }
-            
-        cChocoFeature allowGlobalConfirmation {
-            FeatureName = "allowGlobalConfirmation"
-            Ensure      = 'Present'
-            DependsOn   = '[cChocoInstaller]installChoco'
-        }
-        
-        cChocoFeature useRememberedArgumentsForUpgrades {
-            FeatureName = "useRememberedArgumentsForUpgrades"
-            Ensure      = 'Present'
-            DependsOn   = '[cChocoInstaller]installChoco'
-        }
-        
-        cChocoPackageInstaller "Install Chromium Edge" {
-            Name        = 'microsoft-edge'
-            Ensure      = 'Present'
-            AutoUpgrade = $true
-            DependsOn   = '[cChocoInstaller]installChoco'
-        }
-
-        cShortcut "Wac Shortcut"
-        {
-            Path      = 'C:\Users\Public\Desktop\Windows Admin Center.lnk'
-            Target    = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
-            Arguments = "https://$env:computerName"
-            Icon      = 'shell32.dll,34'
-        }
-
-        #### STAGE 3c - Update Firewall
-
-        Firewall WACInboundRule {
-            Name        = 'WACInboundRule'
-            DisplayName = 'Allow Windows Admin Center'
-            Ensure      = 'Present'
-            Enabled     = 'True'
-            Profile     = 'Any'
-            Direction   = 'Inbound'
-            LocalPort   = "443"
-            Protocol    = 'TCP'
-            Description = 'Allow Windows Admin Center'
-        }
-
-        Firewall WACOutboundRule {
-            Name        = 'WACOutboundRule'
-            DisplayName = 'Allow Windows Admin Center'
-            Ensure      = 'Present'
-            Enabled     = 'True'
-            Profile     = 'Any'
-            Direction   = 'Outbound'
-            LocalPort   = "443"
-            Protocol    = 'TCP'
-            Description = 'Allow Windows Admin Center'
         }
     }
 }

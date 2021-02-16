@@ -304,7 +304,6 @@
         "artifactsLocation": "https://raw.githubusercontent.com/mattmcspirit/jsontesting/ADTest/",
         "randomGUID": "[substring(uniqueString(subscription().subscriptionId, resourceGroup().id, parameters('virtualMachineName')),0,6)]",
         "dnsNameForPublicIP": "[toLower(concat(parameters('virtualMachineName'), variables('randomGUID')))]",
-        "environment": "Workgroup",
         "virtualNetworkName": "AKSHCILabvNet",
         "networkInterfaceName": "AKSHCILabNIC1",
         "networkSecurityGroupName": "AKSHCILabNSG",
@@ -484,35 +483,11 @@
             "resources": [
                 {
                     "type": "extensions",
-                    "name": "InstallWAC",
-                    "apiVersion": "2018-06-01",
-                    "location": "[resourceGroup().location]",
-                    "dependsOn": [
-                        "[parameters('virtualMachineName')]"
-                    ],
-                    "properties": {
-                        "publisher": "Microsoft.Compute",
-                        "type": "CustomScriptExtension",
-                        "typeHandlerVersion": "1.10",
-                        "autoUpgradeMinorVersion": true,
-                        "settings": {
-                            "fileUris": [
-                                "[uri(variables('artifactsLocation'), concat('scripts/installWac.ps1'))]"
-                            ]
-                        },
-                        "protectedSettings": {
-                            "commandToExecute": "[concat('powershell -ExecutionPolicy Unrestricted -File installWac.ps1', ' -userName ', parameters('adminUsername'))]"
-                        }
-                    }
-                },
-                {
-                    "type": "extensions",
                     "name": "ConfigureAksHciHost",
                     "apiVersion": "2020-06-01",
                     "location": "[resourceGroup().location]",
                     "dependsOn": [
-                        "[parameters('virtualMachineName')]",
-                        "[resourceId('Microsoft.Compute/virtualMachines/extensions', parameters('virtualMachineName'), 'InstallWAC')]"
+                        "[parameters('virtualMachineName')]"
                     ],
                     "properties": {
                         "publisher": "Microsoft.Powershell",
@@ -528,7 +503,6 @@
                             },
                             "configurationArguments": {
                                 "DomainName": "[parameters('domainName')]",
-                                "environment": "[variables('environment')]",
                                 "enableDHCP": "[parameters('enableDHCP')]",
                                 "customRdpPort": "[parameters('customRdpPort')]"
                             }
