@@ -75,17 +75,6 @@
                 "description": "Select your VM generation, ideally Gen 2. Not all Azure regions support Gen 2 VMs."
             }
         },
-        "environment": {
-            "type": "string",
-            "defaultValue": "Workgroup",
-            "allowedValues": [
-                "Workgroup",
-                "AD Domain"
-            ],
-            "metadata": {
-                "description": "Choose to configure your environment in a Workgroup or Active Directory domain. Deployment time for Workgroup is around 13 minutes, and around 25 minutes for an Active Directory-based environment"
-            }
-        },
         "domainName": {
             "type": "string",
             "defaultValue": "akshci.local",
@@ -315,6 +304,7 @@
         "artifactsLocation": "https://raw.githubusercontent.com/mattmcspirit/jsontesting/ADTest/",
         "randomGUID": "[substring(uniqueString(subscription().subscriptionId, resourceGroup().id, parameters('virtualMachineName')),0,6)]",
         "dnsNameForPublicIP": "[toLower(concat(parameters('virtualMachineName'), variables('randomGUID')))]",
+        "environment": "Workgroup",
         "virtualNetworkName": "AKSHCILabvNet",
         "networkInterfaceName": "AKSHCILabNIC1",
         "networkSecurityGroupName": "AKSHCILabNSG",
@@ -538,7 +528,7 @@
                             },
                             "configurationArguments": {
                                 "DomainName": "[parameters('domainName')]",
-                                "environment": "[parameters('environment')]",
+                                "environment": "[variables('environment')]",
                                 "enableDHCP": "[parameters('enableDHCP')]",
                                 "customRdpPort": "[parameters('customRdpPort')]"
                             }
