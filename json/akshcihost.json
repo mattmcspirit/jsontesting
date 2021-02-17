@@ -105,7 +105,7 @@
                 "1024"
             ],
             "metadata": {
-                "description": "The size of the individual data disks in GiB. 8 of these will be provisioned therefore 64GiB is the recommended default."
+                "description": "The size of the individual data disks in GiB. 8 of these will be provisioned therefore 32GiB is the recommended default."
             }
         },
         "adminUsername": {
